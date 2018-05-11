@@ -1,7 +1,8 @@
 #!/bin/bash
 
 args=("$@")
-
+arrExternal=()
+arrInfo=()
 #if all arguments given
 check_arguments (){
 	if [ "${args[0]}" == "" ]; then
@@ -63,21 +64,78 @@ create_websites(){
 }
 
 #create and handle page content
-create_page_content(){
-	echo "content"
+addinfo_page_content(){
+	#printf "<!DOCTYPE html>\n<html>\n	<body>\n"
+	#calc random k
+	lines=$( wc -l < "${args[1]}" )
+	LIMITK=$(($lines-2000))
+	DIFFK=$((LIMITK-1+1))
+	k=$(($(($RANDOM%$DIFFK))+1))
+	#calc random m
+	DIFFM=$((2000-1000+1))	
+	m=$(($(($RANDOM%$DIFFM))+1000))
+	#calc internal links
+	internalLinks=$(((${#arrPTemp[@]}/2)+1))
+	f=()
+	entries=($(shuf -i 0-$((${#arrPTemp[@]}-1)) -n $internalLinks))
+	LIMITINTERNAL=${#entries[@]}
+	for ((internal=0;internal < LIMITINTERNAL;internal++))
+	{
+		f+=(${arrPTemp[${entries[$internal]}]})
+	}
+	
+	temp=("/$stringw/${arrP[$j]}" "$k" "$m" "$f")
+	arrInfo+=("$temp")
+	#printf "		word1 word2 … <a href=”link1”>link1_text</a>\n"
+	#printf "		wordn wordn+1 … <a href=”link2”>link2_text</a>"
+	#printf " wordm wordm+1 ...\n"
+	
+	
+	#printf "	</body>\n</html>"
+}
+
+add_external_info(){
+	array1=(name1 name2)
+	name1=(one two)
+	name2=(red blue)
+
+
+	for name in "${array1[@]}"
+	do
+	  typeset -n nameref="$name"
+	  for value in "${nameref[@]}"
+	  do
+		printf '%s\n' "$name - $value"
+	  done
+	done
 }
 
 #create pages in each website
-create_pages(){
+handle_pages(){
 	LIMITW=${args[2]}-1
 	LIMITP=${args[3]}-1
+	zero=0
 	for ((i=0;i <= LIMITW;i++))
 	{
 		stringw="site$i"
+		arrP=()
 		for ((j=0;j <= LIMITP;j++))
 		{
 			stringp="page"$i"_$RANDOM.html"
-			echo 'Hello, world.' > "./${args[0]}/$stringw/$stringp"
+			arrP+=($stringp)
+			arrPTemp+=($stringp)
+		}
+		for ((j=0;j <= LIMITP;j++))
+		{
+			#delete same page from internal links
+			if (("$LIMITP" > "$zero"));  then
+				unset arrPTemp[$j]
+				arrPTemp=( "${arrPTemp[@]}" )
+			fi
+			#create_page_content > "./${args[0]}/$stringw/${arrP[$j]}"
+			addinfo_page_content
+			arrExternal+=("/$stringw/${arrP[$j]}")
+			arrPTemp=("${arrP[@]}")
 		}
 	}
 }
@@ -85,4 +143,5 @@ create_pages(){
 check_arguments
 check_correct_arguments
 create_websites
-create_pages
+handle_pages
+add_external_info
