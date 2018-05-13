@@ -54,6 +54,13 @@ check_correct_arguments (){
 
 #create web directories
 create_websites(){
+	if [ "$(ls -A ${args[0]})" ]; then
+		echo "${args[0]} is not Empty"
+		rm -rf ${args[0]}/*
+	else
+		echo "${args[0]} is Empty"
+	fi
+	
 	LIMIT=${args[2]}-1
 	for ((number=0;number <= LIMIT;number++))
 	{
@@ -72,7 +79,7 @@ save_pages(){
 		stringw="site$i"
 		for ((j=0;j <= LIMITP;j++))
 		{
-			stringp="page"$i"_$RANDOM.html"
+			stringp="page"$j"_$RANDOM.html"
 			stringWhole="./${args[0]}/$stringw/$stringp"
 			arrP+=($stringWhole)
 		}
@@ -118,6 +125,10 @@ calc_content_page(){
 	{
 		f+=(${arrPTemp[${entriesInternal[$internal]}]})
 	}
+	for ((elem=0;elem < ${#f[@]};elem++))
+	do
+		f[$elem]=$(echo ${f[$elem]} | cut -d"/" -f4)
+	done
 
 	#calc external links
 	arrPExt=()
@@ -134,10 +145,17 @@ calc_content_page(){
 	for ((external=0;external < LIMITEXTERNAL;external++))
 	{
 		q+=(${arrPExt[${entriesExteral[$external]}]})
-	}		
+	}
+	for ((elem=0;elem < ${#q[@]};elem++))
+	do
+		q[$elem]="../$(echo ${q[$elem]} | cut -d"/" -f3)/$(echo ${q[$elem]} | cut -d"/" -f4)"
+	done
+	
 }
 
 insert_content_page(){
+	#get f+q
+	combine=( "${f[@]}" "${q[@]}" )
 	printf "<!DOCTYPE html>\n<html>\n	<body>\n"
 	start=$k
 	while [ "$start" -le "$lines" ];
@@ -150,7 +168,14 @@ insert_content_page(){
 		done
 		
 		#add links
-		
+		if [ -n "$combine" ]; then
+			random=($( shuf -i 0-${#combine[@]} -n 1 ))
+			if [ ! -z "${combine[$random]}" ]; then
+				printf "\t\t<a href="${combine[$random]}">	Link: ${combine[$random]}	</a>\n"
+				unset combine[$random]
+				combine=( "${combine[@]}" )
+			fi
+		fi
 		start=$end
 	done
 	printf "\n	</body>\n</html>"
