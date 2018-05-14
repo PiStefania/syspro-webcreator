@@ -16,8 +16,6 @@ check_arguments (){
 	elif [ "${args[3]}" == "" ]; then
 		echo "Need no of sites per website"
 		exit -1
-	else
-		echo "All parameters given"
 	fi
 }
 
@@ -53,20 +51,11 @@ check_correct_arguments (){
 
 
 #create web directories
-create_websites(){
+check_dir(){
 	if [ "$(ls -A ${args[0]})" ]; then
-		echo "${args[0]} is not Empty"
+		>&2 echo "# Warning: directory is full, purging …"
 		rm -rf ${args[0]}/*
-	else
-		echo "${args[0]} is Empty"
 	fi
-	
-	LIMIT=${args[2]}-1
-	for ((number=0;number <= LIMIT;number++))
-	{
-		string="site$number"
-		mkdir "./${args[0]}/$string"
-	}
 }
 
 
@@ -119,7 +108,9 @@ calc_content_page(){
 	}
 	internalLinks=$(((${#arrPTemp[@]}/2)+1))
 	f=()
-	entriesInternal=($(shuf -i 0-$((${#arrPTemp[@]}-1)) -n $internalLinks))
+	if [ -n "$arrPTemp" ]; then
+		entriesInternal=($(shuf -i 0-$((${#arrPTemp[@]}-1)) -n $internalLinks))
+	fi
 	LIMITINTERNAL=${#entriesInternal[@]}
 	for ((internal=0;internal < LIMITINTERNAL;internal++))
 	{
@@ -140,7 +131,9 @@ calc_content_page(){
 	done
 	externalLinks=$(((${#arrPExt[@]}/2)+1))
 	q=()
-	entriesExteral=($(shuf -i 0-$((${#arrPExt[@]}-1)) -n $externalLinks))
+	if [ -n "$arrPExt" ]; then
+		entriesExteral=($(shuf -i 0-$((${#arrPExt[@]}-1)) -n $externalLinks))
+	fi
 	LIMITEXTERNAL=${#entriesExteral[@]}
 	for ((external=0;external < LIMITEXTERNAL;external++))
 	{
@@ -158,9 +151,13 @@ insert_content_page(){
 	combine=( "${f[@]}" "${q[@]}" )
 	printf "<!DOCTYPE html>\n<html>\n	<body>\n"
 	start=$k
-	while [ "$start" -le "$lines" ];
+	add=$(( m/(internalLinks+externalLinks) ))
+	copyLines=$((m + k - add))
+	end=$k
+	link=0
+	while [ "$start" -le "$copyLines" ];
 	do
-		end=$((($m/(internalLinks+externalLinks))+$start))
+		end=$(( add + end ))
 		endpage=""$end"p"
 		sed -n "$start,$endpage" ${args[1]} |
 		while read line; do
@@ -171,28 +168,57 @@ insert_content_page(){
 		if [ -n "$combine" ]; then
 			random=($( shuf -i 0-${#combine[@]} -n 1 ))
 			if [ ! -z "${combine[$random]}" ]; then
+				>&2 echo "#   Adding link to ${combine[$random]}"
+				link=1
 				printf "\t\t<a href="${combine[$random]}">	Link: ${combine[$random]}	</a>\n"
 				unset combine[$random]
 				combine=( "${combine[@]}" )
+			else
+				>&2 echo "----------------------------------------------------------------ELSE"
 			fi
 		fi
-		start=$end
+		start=$(( start + add ))
 	done
+	
+	
+	>&2 echo "----------------------------------------------------------------COMBINE IS: ${combine[@]}"
+	if [ "$link" -ne "1" ]; then
+		links=0
+	fi
 	printf "\n	</body>\n</html>"
 }
 
 #create and handle page content
 add_content_pages(){
-
-	for page in ${arrP[@]}
-	do
-		calc_content_page
-		insert_content_page > $page
-	done
+	links=1
+	LIMITW=${args[2]}
+	LIMITP=${args[3]}
+	startP=0
+	for ((number=0;number <LIMITW;number++))
+	{
+		stringw="site$number"
+		>&2 echo "# Creating web site $number …"
+		mkdir "./${args[0]}/$stringw"
+		for ((j=startP;j < $((LIMITP + startP)) ;j++))
+		{
+			page=${arrP[$j]}
+			calc_content_page
+			>&2 echo "#   Creating page $page with $m lines starting at line $k …"
+			insert_content_page > $page
+		}
+		startP=$(( $startP + $LIMITP ))
+	}
+	
+	if [ "$links" -eq "1" ]; then
+		>&2 echo "# All pages have at least one incoming link"
+	else
+		>&2 echo "# Not all pages have an incoming link"
+	fi
+	>&2 echo "# Done."
 }
 
 check_arguments
 check_correct_arguments
-create_websites
+check_dir
 save_pages
 add_content_pages
