@@ -41,11 +41,21 @@ check_correct_arguments (){
 	if ! [[ "${args[2]}" =~ ^[0-9]+$ ]]; then
         echo "${args[2]} is not an integer"
 		exit -2
+	else
+		if [ "${args[2]}" -eq "0" ]; then
+			echo "Too few websites to create"
+			exit -2
+		fi
 	fi
 	
 	if ! [[ "${args[3]}" =~ ^[0-9]+$ ]]; then
         echo "${args[3]} is not an integer"
 		exit -2
+	else
+		if [ "${args[3]}" -eq "0" ]; then
+			echo "Too few pages to create"
+			exit -2
+		fi
 	fi
 }
 
@@ -157,6 +167,7 @@ insert_content_page(){
 	link=0
 	while [ "$start" -le "$copyLines" ];
 	do
+		found=0
 		end=$(( add + end ))
 		endpage=""$end"p"
 		sed -n "$start,$endpage" ${args[1]} |
@@ -164,33 +175,45 @@ insert_content_page(){
 		 	printf "\t\t$line\n"
 		done
 		
-		#add links
+			#add links
 		if [ -n "$combine" ]; then
-			random=($( shuf -i 0-${#combine[@]} -n 1 ))
-			if [ ! -z "${combine[$random]}" ]; then
-				>&2 echo "#   Adding link to ${combine[$random]}"
-				link=1
-				printf "\t\t<a href="${combine[$random]}">	Link: ${combine[$random]}	</a>\n"
-				unset combine[$random]
-				combine=( "${combine[@]}" )
-			else
-				>&2 echo "----------------------------------------------------------------ELSE"
-			fi
+			while [ "$found" -eq "0" ];
+			do
+				random=($( shuf -i 0-${#combine[@]} -n 1 ))
+				if [ ! -z "${combine[$random]}" ]; then
+					modifyStr=$(echo ${combine[$random]} | cut -d"." -f2)
+					if [ "$modifyStr" = "html" ]; then
+						ss=$(echo $page | cut -d"/" -f3)
+						modifyStr="${args[0]}/$ss/${combine[$random]}"
+					else
+						ss=$(echo ${combine[$random]} | cut -d"/" -f2)
+						sp=$(echo ${combine[$random]} | cut -d"/" -f3)
+						modifyStr="${args[0]}/$ss/$sp"
+					fi	
+					>&2 echo "#     Adding link to $modifyStr"
+					link=1
+					printf "\t\t<a href="${combine[$random]}">	Link: ${combine[$random]}	</a>\n"
+					unset combine[$random]
+					combine=( "${combine[@]}" )
+					found=1
+				fi
+			done
 		fi
+		
 		start=$(( start + add ))
 	done
 	
-	
-	>&2 echo "----------------------------------------------------------------COMBINE IS: ${combine[@]}"
 	if [ "$link" -ne "1" ]; then
 		links=0
+	else
+		links=1
 	fi
 	printf "\n	</body>\n</html>"
 }
 
 #create and handle page content
 add_content_pages(){
-	links=1
+	links=0
 	LIMITW=${args[2]}
 	LIMITP=${args[3]}
 	startP=0
