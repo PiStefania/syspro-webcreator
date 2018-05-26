@@ -6,7 +6,6 @@
 #include <netinet/in.h> 	// internet sockets
 #include <netdb.h> 			// gethostbyaddr
 #include <unistd.h>
-#include <ctype.h> 			// toupper
 #include "variousMethods.h"
 
 
@@ -38,7 +37,7 @@ int main (int argc,char* argv[]){
 		perror("listen");
 		exit(1);
 	}
-	printf("Listening for connections to port %d\n", port);		//Listen for connections
+	//printf("Listening for connections to port %d\n", port);		//Listen for connections
 	while (1) { 
 		clientlen = sizeof(client);
 		if ((newsock = accept(sock, clientptr, &clientlen))< 0){ 	// accept connection
@@ -49,14 +48,8 @@ int main (int argc,char* argv[]){
 			herror("gethostbyaddr"); 
 			exit(1);
 		}
-		printf("Accepted connection from %s\n", rem->h_name);
-		char buf[1];
-		while(read(newsock, buf, 1) > 0){ 		// Receive 1 char
-			putchar(buf[0]); 					// Print received char
-			buf[0] = toupper(buf[0]);			// Capitalize character
-			if (write(newsock, buf, 1) < 0)		// Reply
-				perror("write");
-		}	
+		
+		readGetLinesFromCrawler(newsock);
 	}
 	printf("Closing connection.\n");
 	close(sock);

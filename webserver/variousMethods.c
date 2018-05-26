@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <unistd.h>
 #include "variousMethods.h"
+#define DEF_BUFFER_SIZE 128
 
 //specifies whether or not the arguments given are correct
 void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,int* numThreads,char** rootDir){
@@ -55,5 +57,37 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 		closedir(dir);
 		exit(1);
 	}
+}
 
+void readGetLinesFromCrawler(int newsock){
+	char ch;
+	char* buffer = malloc(DEF_BUFFER_SIZE*sizeof(char));
+	int i=0;
+	int div=1;
+	while(1){
+		while(read(newsock, &ch, 1) > 0){
+			//end of line reached
+			if(ch == '\n'){
+				i=0;
+				div=1;
+				break;
+			}
+			//max size reached
+			if(i == (DEF_BUFFER_SIZE/div)){
+				div++;
+				buffer = realloc(buffer,(div*DEF_BUFFER_SIZE)*sizeof(char));
+			}
+
+			buffer[i] = ch;
+			i++;
+		}
+		printf("TOOK: %s\n",buffer);
+		if(write(newsock, buffer, strlen(buffer)) < 0){
+			perror("write");
+			exit(1);
+		}
+		memset(buffer,0,strlen(buffer));
+	}
+	free(buffer);
+	buffer = NULL;
 }

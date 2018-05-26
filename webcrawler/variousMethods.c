@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <unistd.h>
 #include "variousMethods.h"
+#define DEF_BUFFER_SIZE 128
 
 //specifies whether or not the arguments given are correct
 void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* commandPort,int* numThreads,char** saveDir,char** startingUrl){
@@ -70,6 +72,44 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 		printf("Starting Url is NULL\n");
 		exit(1);
 	}
-	
-	
+}
+
+void readGetLinesFromServer(int socket){
+	int readStdin;
+	size_t len = 0;
+	char* line = NULL;
+	char ch;
+	char* buffer = malloc(DEF_BUFFER_SIZE*sizeof(char));
+	int i=0;
+	int div=1;
+	while(1){
+		if((readStdin = getline(&line, &len, stdin)) != -1){
+			if(write(socket, line, strlen(line)) < 0){
+				perror("write");
+				exit(1);
+			}
+		}else{
+			break;
+		}
+		
+		while(read(socket, &ch, 1) > 0){
+			//end of line reached
+			if(ch == '\n'){
+				i=0;
+				div=1;
+				break;
+			}
+			//max size reached
+			if(i == (DEF_BUFFER_SIZE/div)){
+				div++;
+				buffer = realloc(buffer,(div*DEF_BUFFER_SIZE)*sizeof(char));
+			}
+			buffer[i] = ch;
+			i++;
+		}
+		printf("SENT: %s\n",buffer);
+		memset(buffer,0,strlen(buffer));
+	}
+	free(buffer);
+	buffer = NULL;
 }

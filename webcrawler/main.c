@@ -19,7 +19,6 @@ int main (int argc,char* argv[]){
 	pickArgumentsMain(argc,argv,&hostIP,&serverPort,&commandPort,&numThreads,&saveDir,&startingUrl);
 	
 	int port, sock, i;
-	char buf[256];
 	struct sockaddr_in server;
 	struct sockaddr *serverptr = (struct sockaddr*)&server;
 	struct hostent *rem;
@@ -39,21 +38,9 @@ int main (int argc,char* argv[]){
 		perror("connect");
 		exit(1);
 	}
-	printf("Connecting to %s port %d\n", argv[1], port);
-	do {
-		printf("Give input string: ");
-		fgets(buf, sizeof(buf), stdin); 					// Read from stdin
-		for(i=0; buf[i] != '\0'; i++) { 					// For every char 
-			if (write(sock, buf + i, 1) < 0){				// Send i-th character
-				perror("write");
-				exit(1);
-			}if (read(sock, buf + i, 1) < 0){				// receive i-th character transformed
-				perror("read");
-				exit(1);
-			}
-		}
-		printf("Received string: %s", buf);
-	}while(strcmp(buf, "END\n") != 0); 						// Finish on "end"
+	
+	//read lines and send to server
+	readGetLinesFromServer(sock);
 	close(sock);
 	return 0;
 }
