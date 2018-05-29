@@ -4,7 +4,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include "variousMethods.h"
-#define DEF_BUFFER_SIZE 128
+#define DEF_BUFFER_SIZE 4096
 
 //specifies whether or not the arguments given are correct
 void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* commandPort,int* numThreads,char** saveDir,char** startingUrl){
@@ -78,38 +78,69 @@ void readGetLinesFromServer(int socket){
 	int readStdin;
 	size_t len = 0;
 	char* line = NULL;
-	char ch;
-	char* buffer = malloc(DEF_BUFFER_SIZE*sizeof(char));
-	int i=0;
-	int div=1;
+	int chars=0;
+	char buffer[DEF_BUFFER_SIZE];
+	int requestFlag = 1;
+	int init = 0;
 	while(1){
-		if((readStdin = getline(&line, &len, stdin)) != -1){
-			if(write(socket, line, strlen(line)) < 0){
-				perror("write");
-				exit(1);
+		if((readStdin = getline(&line, &len, stdin)) != -1 && requestFlag){
+			chars += strlen(line);
+			if(chars > DEF_BUFFER_SIZE){
+				break;
+			}else if(strcmp(line,"\n")==0){
+				if(write(socket, &chars, sizeof(int)) < 0){
+					perror("write");
+					exit(1);
+				}
+
+				if(write(socket, buffer, chars) < 0){
+					perror("write");
+					exit(1);
+				}
+				memset(buffer,0,chars);
+				chars = 0;
+				requestFlag = 0;
+			}else{
+				if(init==0){
+					strcpy(buffer,line);
+					init++;
+				}else{
+					strcat(buffer,line);
+				}
 			}
-		}else{
-			break;
 		}
 		
-		while(read(socket, &ch, 1) > 0){
-			//end of line reached
-			if(ch == '\n'){
-				i=0;
-				div=1;
-				break;
+		if(!requestFlag){
+			int answerChars = 0;
+			if(read(socket, &answerChars, sizeof(int)) < 0){
+				perror("read");
+				exit(1);
 			}
-			//max size reached
-			if(i == (DEF_BUFFER_SIZE/div)){
-				div++;
-				buffer = realloc(buffer,(div*DEF_BUFFER_SIZE)*sizeof(char));
+			
+			int div = answerChars / DEF_BUFFER_SIZE;
+			char answerBuffer[answerChars];
+			if(div>1){
+				char temp[DEF_BUFFER_SIZE];
+				for(int i=0;i<div;i++){
+					if(read(socket, temp, DEF_BUFFER_SIZE) < 0){
+						perror("read");
+						exit(1);
+					}
+					if(i==0){
+						strcpy(answerBuffer,temp);
+					}else{
+						strcat(answerBuffer,temp);
+					}
+				}
+			}else{
+				if(read(socket, answerBuffer, answerChars) < 0){
+					perror("read");
+					exit(1);
+				}
 			}
-			buffer[i] = ch;
-			i++;
+			//if answer is positive, create file and add source
+			memset(answerBuffer,0,answerChars);
+			requestFlag = 1;
 		}
-		printf("SENT: %s\n",buffer);
-		memset(buffer,0,strlen(buffer));
 	}
-	free(buffer);
-	buffer = NULL;
 }

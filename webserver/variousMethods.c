@@ -4,7 +4,8 @@
 #include <dirent.h>
 #include <unistd.h>
 #include "variousMethods.h"
-#define DEF_BUFFER_SIZE 128
+#include "httpRequests.h"
+#define DEF_BUFFER_SIZE 4096
 
 //specifies whether or not the arguments given are correct
 void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,int* numThreads,char** rootDir){
@@ -59,35 +60,48 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 	}
 }
 
-void readGetLinesFromCrawler(int newsock){
+void readGetLinesFromCrawler(int newsock,char* rootDir){
 	char ch;
-	char* buffer = malloc(DEF_BUFFER_SIZE*sizeof(char));
-	int i=0;
-	int div=1;
 	while(1){
-		while(read(newsock, &ch, 1) > 0){
-			//end of line reached
-			if(ch == '\n'){
-				i=0;
-				div=1;
-				break;
-			}
-			//max size reached
-			if(i == (DEF_BUFFER_SIZE/div)){
-				div++;
-				buffer = realloc(buffer,(div*DEF_BUFFER_SIZE)*sizeof(char));
-			}
-
-			buffer[i] = ch;
-			i++;
+		int chars = 0;
+		if(read(newsock, &chars, sizeof(int)) < 0){
+			perror("read");
+			exit(1);
 		}
-		printf("TOOK: %s\n",buffer);
-		if(write(newsock, buffer, strlen(buffer)) < 0){
+		printf("chars: %d\n",chars);
+		char buffer[chars];
+		if(read(newsock, &buffer, chars) < 0){
+			perror("read");
+			exit(1);
+		}
+		
+		//check request
+		int checkRequest = checkRequestInfo(buffer,rootDir);
+		
+		//get answer for request
+		
+		//initially write size of answer in socket
+		if(write(newsock, &chars, sizeof(int)) < 0){
 			perror("write");
 			exit(1);
 		}
-		memset(buffer,0,strlen(buffer));
+		
+		int div = chars / DEF_BUFFER_SIZE;
+		if(div>1){
+			int bef = 0;
+			for(int i=0;i<div;i++){
+				if(write(newsock, buffer + bef, DEF_BUFFER_SIZE) < 0){
+					perror("write");
+					exit(1);
+				}
+				bef += DEF_BUFFER_SIZE;
+			}
+		}else{
+			if(write(newsock, buffer, chars) < 0){
+				perror("write");
+				exit(1);
+			}
+		}
+		memset(buffer,0,chars);
 	}
-	free(buffer);
-	buffer = NULL;
 }

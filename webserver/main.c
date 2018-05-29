@@ -49,7 +49,7 @@ int main (int argc,char* argv[]){
 			exit(1);
 		}
 		
-		readGetLinesFromCrawler(newsock);
+		readGetLinesFromCrawler(newsock,rootDir);
 	}
 	printf("Closing connection.\n");
 	close(sock);

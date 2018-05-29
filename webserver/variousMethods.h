@@ -2,6 +2,6 @@
 #define _VARIOUSMETHODS_H_
 
 void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,int* numThreads,char** rootDir);
-void readGetLinesFromCrawler(int newsock);
+void readGetLinesFromCrawler(int newsock,char* rootDir);
 
 #endif
