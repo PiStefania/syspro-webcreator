@@ -3,6 +3,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <math.h>
 #include "variousMethods.h"
 #include "httpRequests.h"
 #define DEF_BUFFER_SIZE 4096
@@ -68,7 +69,7 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 			perror("read");
 			exit(1);
 		}
-		printf("chars: %d\n",chars);
+		
 		char buffer[chars];
 		if(read(newsock, &buffer, chars) < 0){
 			perror("read");
@@ -76,32 +77,58 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 		}
 		
 		//check request
-		int checkRequest = checkRequestInfo(buffer,rootDir);
-		
-		//get answer for request
-		
+		char* response = NULL;
+		char* file = NULL;
+		int checkRequest = checkRequestInfo(buffer,&file);
+		if(file == NULL){
+			printf("NO FILE GIVEN\n");
+		}else if(!checkRequest){
+			printf("WRONG INPUT\n");
+		}
+		else{	//get answer for request
+			int fullLength = strlen(file) + strlen(rootDir) + 2;
+			char* fullPath = malloc(fullLength*sizeof(char));
+			strcpy(fullPath,rootDir);
+			strcat(fullPath,file);
+				
+			//construct response for webcrawler
+			response = constructResponse(fullPath);
+		}
+				
+		int lengthResponse = strlen(response);
 		//initially write size of answer in socket
-		if(write(newsock, &chars, sizeof(int)) < 0){
+		if(write(newsock, &lengthResponse, sizeof(int)) < 0){
 			perror("write");
 			exit(1);
 		}
 		
-		int div = chars / DEF_BUFFER_SIZE;
+		int div = lengthResponse / DEF_BUFFER_SIZE;
 		if(div>1){
 			int bef = 0;
-			for(int i=0;i<div;i++){
-				if(write(newsock, buffer + bef, DEF_BUFFER_SIZE) < 0){
+			for(int i=0;i<=div;i++){
+				if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
 					perror("write");
 					exit(1);
 				}
 				bef += DEF_BUFFER_SIZE;
 			}
 		}else{
-			if(write(newsock, buffer, chars) < 0){
+			if(write(newsock, response, lengthResponse) < 0){
 				perror("write");
 				exit(1);
 			}
 		}
-		memset(buffer,0,chars);
 	}
+}
+
+
+int getNumberLength(int no){
+	int numberLength;
+	if(no == 0){
+		numberLength = 1;
+	}else{
+		numberLength = floor(log10(abs(no))) + 1;
+	}
+	
+	return numberLength;
 }

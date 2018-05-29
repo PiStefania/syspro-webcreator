@@ -3,5 +3,6 @@
 
 void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,int* numThreads,char** rootDir);
 void readGetLinesFromCrawler(int newsock,char* rootDir);
+int getNumberLength(int no);
 
 #endif

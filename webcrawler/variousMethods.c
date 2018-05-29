@@ -111,35 +111,37 @@ void readGetLinesFromServer(int socket){
 		}
 		
 		if(!requestFlag){
-			int answerChars = 0;
-			if(read(socket, &answerChars, sizeof(int)) < 0){
+			int responseChars = 0;
+			if(read(socket, &responseChars, sizeof(int)) < 0){
 				perror("read");
 				exit(1);
 			}
 			
-			int div = answerChars / DEF_BUFFER_SIZE;
-			char answerBuffer[answerChars];
+			int div = responseChars / DEF_BUFFER_SIZE;
+			char responseBuffer[responseChars];
 			if(div>1){
 				char temp[DEF_BUFFER_SIZE];
-				for(int i=0;i<div;i++){
+				for(int i=0;i<=div;i++){
 					if(read(socket, temp, DEF_BUFFER_SIZE) < 0){
 						perror("read");
 						exit(1);
 					}
 					if(i==0){
-						strcpy(answerBuffer,temp);
+						strcpy(responseBuffer,temp);
 					}else{
-						strcat(answerBuffer,temp);
+						strcat(responseBuffer,temp);
 					}
 				}
+				responseBuffer[responseChars-1] = '\0';
 			}else{
-				if(read(socket, answerBuffer, answerChars) < 0){
+				if(read(socket, responseBuffer, responseChars) < 0){
 					perror("read");
 					exit(1);
 				}
 			}
+			printf("SENT: %s\n",responseBuffer);
 			//if answer is positive, create file and add source
-			memset(answerBuffer,0,answerChars);
+			memset(responseBuffer,0,responseChars);
 			requestFlag = 1;
 		}
 	}
