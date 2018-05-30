@@ -98,7 +98,7 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 		int lengthResponse = strlen(response);
 		//initially write size of answer in socket
 		if(write(newsock, &lengthResponse, sizeof(int)) < 0){
-			perror("write");
+			perror("write size");
 			exit(1);
 		}
 		
@@ -106,9 +106,16 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 		if(div>1){
 			int bef = 0;
 			for(int i=0;i<=div;i++){
-				if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
-					perror("write");
-					exit(1);
+				if(i==div){
+					if(write(newsock, response + bef, lengthResponse-bef) < 0){
+						perror("write last part");
+						exit(1);
+					}
+				}else{
+					if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
+						perror("write part");
+						exit(1);
+					}
 				}
 				bef += DEF_BUFFER_SIZE;
 			}

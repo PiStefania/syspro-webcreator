@@ -89,21 +89,22 @@ void readGetLinesFromServer(int socket){
 				break;
 			}else if(strcmp(line,"\n")==0){
 				if(write(socket, &chars, sizeof(int)) < 0){
-					perror("write");
+					perror("write size of lines");
 					exit(1);
 				}
 
 				if(write(socket, buffer, chars) < 0){
-					perror("write");
+					perror("write lines");
 					exit(1);
 				}
 				memset(buffer,0,chars);
 				chars = 0;
 				requestFlag = 0;
+				init = 0;
 			}else{
 				if(init==0){
 					strcpy(buffer,line);
-					init++;
+					init = 1;
 				}else{
 					strcat(buffer,line);
 				}
@@ -120,29 +121,47 @@ void readGetLinesFromServer(int socket){
 			int div = responseChars / DEF_BUFFER_SIZE;
 			char responseBuffer[responseChars];
 			if(div>1){
+				int size = 0;
 				char temp[DEF_BUFFER_SIZE];
 				for(int i=0;i<=div;i++){
-					if(read(socket, temp, DEF_BUFFER_SIZE) < 0){
-						perror("read");
-						exit(1);
-					}
-					if(i==0){
-						strcpy(responseBuffer,temp);
+					if(i!=div){
+						if(read(socket, temp, DEF_BUFFER_SIZE) < 0){
+							perror("read");
+							exit(1);
+						}
+						temp[DEF_BUFFER_SIZE-1] = '\0';
+						if(i==0){
+							strcpy(responseBuffer,temp);
+						}else{
+							strcat(responseBuffer,temp);
+						}
+						size += DEF_BUFFER_SIZE;
 					}else{
-						strcat(responseBuffer,temp);
+						char temp1[responseChars-size+1];
+						if(read(socket, temp1, responseChars-size) < 0){
+							perror("read");
+							exit(1);
+						}
+						temp1[responseChars-size] = '\0';
+						strcat(responseBuffer,temp1);
 					}
 				}
-				responseBuffer[responseChars-1] = '\0';
 			}else{
 				if(read(socket, responseBuffer, responseChars) < 0){
 					perror("read");
 					exit(1);
 				}
 			}
-			printf("SENT: %s\n",responseBuffer);
-			//if answer is positive, create file and add source
+			
+			//insert link to queue and content to new file
+			
+			
 			memset(responseBuffer,0,responseChars);
 			requestFlag = 1;
 		}
 	}
+}
+
+void createFileSaveDir(char* response, char* fileName){
+	
 }

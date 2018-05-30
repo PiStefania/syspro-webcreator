@@ -7,6 +7,7 @@
 #include <unistd.h> 		// read, write, close
 #include <netdb.h> 			// gethostbyaddr
 #include "variousMethods.h"
+#include "linksQueue.h"
 
 
 int main (int argc,char* argv[]){
@@ -38,6 +39,12 @@ int main (int argc,char* argv[]){
 		perror("connect");
 		exit(1);
 	}
+	
+	//create linksQueue
+	linksQueue* queue = createLinksQueue();
+	char* link = convertToLink(startingUrl);
+	printf("LINK: %s\n",link);
+	pushLinksQueue(queue,link);
 	
 	//read lines and send to server
 	readGetLinesFromServer(sock);
