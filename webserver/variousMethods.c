@@ -58,6 +58,13 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
     	printf("Root directory doesn't exist\n");
 		closedir(dir);
 		exit(1);
+	}else{
+		struct dirent* file = readdir(dir);
+		if(file == NULL){
+			printf("Root directory is empty\n");
+			closedir(dir);
+			exit(1);
+		}
 	}
 }
 

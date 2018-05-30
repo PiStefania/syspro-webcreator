@@ -47,7 +47,7 @@ int main (int argc,char* argv[]){
 	pushLinksQueue(queue,link);
 	
 	//read lines and send to server
-	readGetLinesFromServer(sock);
+	readGetLinesFromServer(queue,hostIP,sock,saveDir);
 	close(sock);
 	return 0;
 }

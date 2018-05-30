@@ -3,6 +3,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "variousMethods.h"
 #define DEF_BUFFER_SIZE 4096
 
@@ -66,6 +68,10 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
     	printf("Save directory doesn't exist\n");
 		closedir(dir);
 		exit(1);
+	}else{
+		char* command = malloc((strlen("rm -rf ")+strlen(*saveDir)+3)*sizeof(char));
+		sprintf(command,"rm -rf %s/*",*saveDir);
+		system(command);
 	}
 	
 	if(*startingUrl == NULL){
@@ -74,50 +80,38 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 	}
 }
 
-void readGetLinesFromServer(int socket){
-	int readStdin;
-	size_t len = 0;
-	char* line = NULL;
+void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* saveDir){
 	int chars=0;
-	char buffer[DEF_BUFFER_SIZE];
 	int requestFlag = 1;
 	int init = 0;
 	while(1){
-		if((readStdin = getline(&line, &len, stdin)) != -1 && requestFlag){
-			chars += strlen(line);
-			if(chars > DEF_BUFFER_SIZE){
-				break;
-			}else if(strcmp(line,"\n")==0){
-				if(write(socket, &chars, sizeof(int)) < 0){
-					perror("write size of lines");
-					exit(1);
-				}
-
-				if(write(socket, buffer, chars) < 0){
-					perror("write lines");
-					exit(1);
-				}
-				memset(buffer,0,chars);
-				chars = 0;
-				requestFlag = 0;
-				init = 0;
-			}else{
-				if(init==0){
-					strcpy(buffer,line);
-					init = 1;
-				}else{
-					strcat(buffer,line);
-				}
+		char* fileName = NULL;
+		if(!isEmptyLinksQueue(queue) && requestFlag){
+			linkNode* node = popLinksQueue(queue);
+			char* request = createRequest(node->link, host);
+			printf("REQUEST: %s\n",request);
+			fileName = malloc((strlen(node->link)+1)*sizeof(char));
+			strcpy(fileName,node->link);
+			destroyLinkNode(&node);
+			chars = strlen(request);
+			if(write(socket, &chars, sizeof(int)) < 0){
+				perror("write size of lines");
+				exit(1);
 			}
+			if(write(socket, request, chars) < 0){
+				perror("write lines");
+				exit(1);
+			}
+			requestFlag = 0;
 		}
-		
+
 		if(!requestFlag){
 			int responseChars = 0;
 			if(read(socket, &responseChars, sizeof(int)) < 0){
 				perror("read");
 				exit(1);
 			}
-			
+
 			int div = responseChars / DEF_BUFFER_SIZE;
 			char responseBuffer[responseChars];
 			if(div>1){
@@ -129,7 +123,7 @@ void readGetLinesFromServer(int socket){
 							perror("read");
 							exit(1);
 						}
-						temp[DEF_BUFFER_SIZE-1] = '\0';
+						temp[DEF_BUFFER_SIZE] = '\0';
 						if(i==0){
 							strcpy(responseBuffer,temp);
 						}else{
@@ -152,16 +146,33 @@ void readGetLinesFromServer(int socket){
 					exit(1);
 				}
 			}
-			
-			//insert link to queue and content to new file
-			
-			
+
+			//insert content to new file
+			char* content = createFileSaveDir(saveDir,responseBuffer,fileName);
+			//insert links from content to queue
+			insertLinksQueueContent(queue,content);
 			memset(responseBuffer,0,responseChars);
 			requestFlag = 1;
 		}
 	}
 }
 
-void createFileSaveDir(char* response, char* fileName){
-	
+char* createFileSaveDir(char* saveDir, char* response, char* fileName){
+	char* content = strstr(response,"<!DOCTYPE");
+	if(content == NULL){
+		content = strstr(response,"<html>");
+	}
+	int lengthFile = strlen(saveDir) + strlen(fileName) + 2;
+	char* file = malloc(lengthFile*sizeof(char));
+	sprintf(file,"%s%s",saveDir,fileName);
+	char* site = strtok(fileName,"/");
+	char* fullPathDir = malloc((strlen(saveDir)+strlen(site)+2)*sizeof(char));
+	sprintf(fullPathDir,"%s/%s",saveDir,site);
+	int result = mkdir(fullPathDir, 0777);
+	FILE* fp = fopen(file,"w");
+	if(fp != NULL){
+		fputs(content, fp);
+        fclose(fp);
+	}
+	return content;
 }

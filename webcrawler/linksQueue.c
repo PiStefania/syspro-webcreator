@@ -53,6 +53,22 @@ void destroyLinksQueue(linksQueue** queue){
 	*queue = NULL;
 }
 
+void destroyLinkNode(linkNode** node){
+	free((*node)->link);
+	(*node)->link = NULL;
+	(*node)->next = NULL;
+	free(*node);
+	*node = NULL;
+}
+
+
+int isEmptyLinksQueue(linksQueue* queue){
+	if(queue->size == 0){
+		return 1;
+	}
+	return 0;
+}
+
 void printLinksQueue(linksQueue* queue){
 	linkNode* temp = queue->first;
 	for(int i=0;i< queue->size;i++){
@@ -79,6 +95,20 @@ char* convertToLink(char* startingUrl){
 	return link;
 }
 
-char* createRequest(char* link){
-	int lengthFirstLine = strlen();
+char* createRequest(char* link, char* host){
+	int lengthFirstLine = strlen("GET  HTTP/1.1\n") + strlen(link) + 1;
+	int lengthHostLine = strlen("Host: \n") + strlen(host) + 1;
+	int lengthAdditionalLines=strlen("User-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\nAccept-Language: en-us\nAccept-Encoding: gzip, deflate\nConnection: Keep-Alive\n\n")+1;
+	int fullLength = lengthFirstLine + lengthHostLine + lengthAdditionalLines;
+	char* request = malloc(fullLength*sizeof(char));
+	sprintf(request,"GET %s HTTP/1.1\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\nHost: %s\nAccept-Language: en-us\nAccept-Encoding: gzip, deflate\nConnection: Keep-Alive\n",link,host);
+	return request;
+}
+
+void insertLinksQueueContent(linksQueue* queue, char* content){
+	char* linkStart = "<a href=";
+	char* resultStart = strstr(content, linkStart);
+	int positionStart = resultStart - linkStart;
+	int substringLengthStart = strlen(linkStart) - positionStart;
+	char* linkEnd = "</a>";
 }

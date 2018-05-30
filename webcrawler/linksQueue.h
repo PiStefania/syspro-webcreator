@@ -18,7 +18,11 @@ linksQueue* createLinksQueue();
 void pushLinksQueue(linksQueue* queue,char* link);
 linkNode* popLinksQueue(linksQueue* queue);
 void destroyLinksQueue(linksQueue** queue);
+void destroyLinkNode(linkNode** node);
+int isEmptyLinksQueue(linksQueue* queue);
 void printLinksQueue(linksQueue* queue);
 char* convertToLink(char* startingUrl);
+char* createRequest(char* link, char* host);
+void insertLinksQueueContent(linksQueue* queue, char* content);
 
 #endif
