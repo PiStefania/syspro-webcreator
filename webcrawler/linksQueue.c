@@ -18,14 +18,17 @@ void pushLinksQueue(linksQueue* queue,char* link){
 		queue->first->next = NULL;
 		strcpy(queue->first->link,link);
 		queue->last = queue->first;
+		queue->size++;
 	}else{
-		queue->last->next = malloc(sizeof(linkNode));
-		queue->last->next->link = malloc((strlen(link)+1)*sizeof(char));
-		queue->last->next->next = NULL;
-		strcpy(queue->last->next->link,link);
-		queue->last = queue->last->next;
+		if(!checkIfExistsLinksQueue(queue,link)){
+			queue->last->next = malloc(sizeof(linkNode));
+			queue->last->next->link = malloc((strlen(link)+1)*sizeof(char));
+			queue->last->next->next = NULL;
+			strcpy(queue->last->next->link,link);
+			queue->last = queue->last->next;
+			queue->size++;
+		}
 	}
-	queue->size++;
 }
 
 linkNode* popLinksQueue(linksQueue* queue){
@@ -56,7 +59,6 @@ void destroyLinksQueue(linksQueue** queue){
 void destroyLinkNode(linkNode** node){
 	free((*node)->link);
 	(*node)->link = NULL;
-	(*node)->next = NULL;
 	free(*node);
 	*node = NULL;
 }
@@ -67,6 +69,21 @@ int isEmptyLinksQueue(linksQueue* queue){
 		return 1;
 	}
 	return 0;
+}
+
+int checkIfExistsLinksQueue(linksQueue* queue, char* link){
+	linkNode* temp = queue->first;
+	if(temp == NULL)
+		return 0;
+	else{
+		while(temp != NULL){
+			if(strcmp(temp->link,link)==0){
+				return 1;
+			}
+			temp = temp->next;
+		}
+		return 0;
+	}
 }
 
 void printLinksQueue(linksQueue* queue){
@@ -105,10 +122,41 @@ char* createRequest(char* link, char* host){
 	return request;
 }
 
-void insertLinksQueueContent(linksQueue* queue, char* content){
-	char* linkStart = "<a href=";
-	char* resultStart = strstr(content, linkStart);
-	int positionStart = resultStart - linkStart;
-	int substringLengthStart = strlen(linkStart) - positionStart;
-	char* linkEnd = "</a>";
+void insertLinksQueueContent(linksQueue* queue, char* content, char* site){
+	char* resultStart = NULL;
+	do{
+		char* linkStart = "<a href=";
+		resultStart = strstr(content, linkStart);
+		if(resultStart == NULL)
+			break;
+		int positionStart = resultStart - content;
+		char* linkEnd = "</a>";
+		char* resultEnd = strstr(content, linkEnd);
+		int positionEnd = resultEnd + strlen(linkEnd) - content;
+		int subStringLength = positionEnd - positionStart;
+		char link[subStringLength+1];
+		for(int i=0;i<subStringLength;i++){
+			link[i] = content[positionStart+i];
+		}
+		link[subStringLength] = '\0';
+		//alter link
+		char* page = strtok(link,"=");
+		page = strtok(NULL,">");
+		char* newPage = NULL;
+		if(strstr(page,"../") != NULL){
+			newPage = malloc((strlen(page)-1)*sizeof(char));
+			memcpy(newPage,page+2,(strlen(page)-2));
+			newPage[(strlen(page)-2)] = '\0';
+		}else{
+			newPage = malloc((strlen(page)+strlen(site)+3)*sizeof(char));
+			sprintf(newPage,"/%s/%s",site,page);
+		}
+		//printf("new Page: %s\n",newPage);
+		//insert new page to queue
+		pushLinksQueue(queue,newPage);
+		free(newPage);
+		newPage = NULL;
+		content = resultEnd + strlen(linkEnd);
+	} while(resultStart != NULL);
+
 }

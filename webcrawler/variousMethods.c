@@ -72,6 +72,9 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 		char* command = malloc((strlen("rm -rf ")+strlen(*saveDir)+3)*sizeof(char));
 		sprintf(command,"rm -rf %s/*",*saveDir);
 		system(command);
+		free(command);
+		command = NULL;
+		closedir(dir);
 	}
 	
 	if(*startingUrl == NULL){
@@ -89,7 +92,8 @@ void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* sav
 		if(!isEmptyLinksQueue(queue) && requestFlag){
 			linkNode* node = popLinksQueue(queue);
 			char* request = createRequest(node->link, host);
-			printf("REQUEST: %s\n",request);
+			printf("REQUEST\n'%s'\n",request);
+			printLinksQueue(queue);
 			fileName = malloc((strlen(node->link)+1)*sizeof(char));
 			strcpy(fileName,node->link);
 			destroyLinkNode(&node);
@@ -103,6 +107,8 @@ void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* sav
 				exit(1);
 			}
 			requestFlag = 0;
+			free(request);
+			request = NULL;
 		}
 
 		if(!requestFlag){
@@ -113,7 +119,7 @@ void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* sav
 			}
 
 			int div = responseChars / DEF_BUFFER_SIZE;
-			char responseBuffer[responseChars];
+			char* responseBuffer = malloc((responseChars+1)*sizeof(char));
 			if(div>1){
 				int size = 0;
 				char temp[DEF_BUFFER_SIZE];
@@ -150,9 +156,16 @@ void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* sav
 			//insert content to new file
 			char* content = createFileSaveDir(saveDir,responseBuffer,fileName);
 			//insert links from content to queue
-			insertLinksQueueContent(queue,content);
-			memset(responseBuffer,0,responseChars);
+			char* site = strtok(fileName,"/");
+			insertLinksQueueContent(queue,content,site);
+			printLinksQueue(queue);
 			requestFlag = 1;
+			free(responseBuffer);
+			responseBuffer = NULL;
+			if(fileName != NULL){
+				free(fileName);
+				fileName = NULL;
+			}
 		}
 	}
 }
@@ -169,10 +182,14 @@ char* createFileSaveDir(char* saveDir, char* response, char* fileName){
 	char* fullPathDir = malloc((strlen(saveDir)+strlen(site)+2)*sizeof(char));
 	sprintf(fullPathDir,"%s/%s",saveDir,site);
 	int result = mkdir(fullPathDir, 0777);
+	free(fullPathDir);
+	fullPathDir = NULL;
 	FILE* fp = fopen(file,"w");
 	if(fp != NULL){
 		fputs(content, fp);
         fclose(fp);
 	}
+	free(file);
+	file = NULL;
 	return content;
 }

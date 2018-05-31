@@ -65,6 +65,7 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 			closedir(dir);
 			exit(1);
 		}
+		closedir(dir);
 	}
 }
 
@@ -77,12 +78,12 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 			exit(1);
 		}
 		
-		char buffer[chars];
+		char buffer[chars+1];
 		if(read(newsock, &buffer, chars) < 0){
 			perror("read");
 			exit(1);
 		}
-		
+		buffer[chars] = '\0';
 		//check request
 		char* response = NULL;
 		char* file = NULL;
@@ -97,9 +98,10 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 			char* fullPath = malloc(fullLength*sizeof(char));
 			strcpy(fullPath,rootDir);
 			strcat(fullPath,file);
-				
 			//construct response for webcrawler
 			response = constructResponse(fullPath);
+			free(fullPath);
+			fullPath = NULL;
 		}
 				
 		int lengthResponse = strlen(response);
@@ -132,6 +134,10 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 				exit(1);
 			}
 		}
+		free(file);
+		file = NULL;
+		free(response);
+		response = NULL;
 	}
 }
 

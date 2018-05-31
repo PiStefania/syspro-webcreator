@@ -17,7 +17,7 @@ int checkRequestInfo(char* request, char** file){
 	int first = 1;
 	int ret = 0;
 	int hostFlag = 0;
-	for(int i=0;i<strlen(request);i++){
+	for(int i=0;i< strlen(request);i++){
 		char ch = request[i];
 		length++;
 		if(ch == '\n'){
@@ -85,17 +85,24 @@ char* constructResponse(char* fullPath){
 			//add time and headers
 			char* timeBuf = insertCurrentTime(&fullLength);
 			char* additionalBuf = insertAdditionalHeaders(&fullLength,lengthSize,size);
-			char* content = malloc((size)*sizeof(char));
-			fread(content, 1, size, fp);
+			char* content = malloc((size+1)*sizeof(char));
+			int siteCopied = fread(content, 1, size, fp);
+			content[siteCopied] = '\0';
 			//copy to response
-			fullLength += size;
+			fullLength += siteCopied+1;
 			response = malloc(fullLength*sizeof(char));
 			strcpy(response,FILE_OK);
 			strcat(response,timeBuf);
 			strcat(response,additionalBuf);
 			strcat(response,content);
-			response[fullLength] = '\0';
+			response[fullLength-1] = '\0';
 			fclose(fp);
+			free(timeBuf);
+			timeBuf = NULL;
+			free(additionalBuf);
+			additionalBuf = NULL;
+			free(content);
+			content = NULL;
 		}else{
 			fullLength += strlen(FILE_NOT_AUTHORIZED);
 			//add time and headers
@@ -110,6 +117,12 @@ char* constructResponse(char* fullPath){
 			strcat(response,additionalBuf);
 			strcat(response,content);
 			response[fullLength] = '\0';
+			free(timeBuf);
+			timeBuf = NULL;
+			free(additionalBuf);
+			additionalBuf = NULL;
+			free(content);
+			content = NULL;
 		}
 	}else{
 		fullLength += strlen(FILE_NOT_FOUND);
@@ -125,6 +138,12 @@ char* constructResponse(char* fullPath){
 		strcat(response,additionalBuf);
 		strcat(response,content);
 		response[fullLength] = '\0';
+		free(timeBuf);
+		timeBuf = NULL;
+		free(additionalBuf);
+		additionalBuf = NULL;
+		free(content);
+		content = NULL;
 	}
 	return response;
 }
@@ -142,7 +161,7 @@ char* insertCurrentTime(int* length){
 
 char* insertAdditionalHeaders(int* length,int contentLength, int size){
 	int sizeAdditional = strlen("Server: myhttpd/1.0.0 (Ubuntu64)\nContent-Length: \nContent-Type: text/html\nConnection: Closed\n\n") + contentLength;
-	char* additionalBuf = malloc(sizeAdditional*sizeof(char));
+	char* additionalBuf = malloc((sizeAdditional+1)*sizeof(char));
 	sprintf(additionalBuf,"Server: myhttpd/1.0.0 (Ubuntu64)\nContent-Length: %d\nContent-Type: text/html\nConnection: Closed\n\n",size);
 	*length += sizeAdditional;
 	return additionalBuf;
