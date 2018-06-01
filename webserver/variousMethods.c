@@ -1,12 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h> 		// sockets
+#include <sys/types.h> 		// sockets
+#include <sys/socket.h> 	// sockets
+#include <netinet/in.h> 	// internet sockets
+#include <netdb.h> 			// gethostbyaddr
 #include <dirent.h>
 #include <unistd.h>
 #include <math.h>
+#include <sys/time.h> 		//FD_SET, FD_ISSET, FD_ZERO macros
+#include <errno.h>
 #include "variousMethods.h"
 #include "httpRequests.h"
+#include "generalInfo.h"
 #define DEF_BUFFER_SIZE 4096
+
 
 //specifies whether or not the arguments given are correct
 void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,int* numThreads,char** rootDir){
@@ -65,7 +74,7 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 	}
 }
 
-void readGetLinesFromCrawler(int newsock,char* rootDir){
+void readGetLinesFromCrawler(int newsock,char* rootDir,generalInfo* info){
 	char ch;
 	while(1){
 		int chars = 0;
@@ -103,14 +112,16 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 		}
 				
 		if(response != NULL){
-		int lengthResponse = strlen(response);
-		//initially write size of answer in socket
-		if(write(newsock, &lengthResponse, sizeof(int)) < 0){
-			perror("write size");
-			exit(1);
-		}
+			info->pagesServed++;
+			info->bytesServed += strlen(response);
+			int lengthResponse = strlen(response);
+			//initially write size of answer in socket
+			if(write(newsock, &lengthResponse, sizeof(int)) < 0){
+				perror("write size");
+				exit(1);
+			}
 		
-		int div = lengthResponse / DEF_BUFFER_SIZE;
+			int div = lengthResponse / DEF_BUFFER_SIZE;
 			if(div>1){
 				int bef = 0;
 				for(int i=0;i<=div;i++){
@@ -151,4 +162,111 @@ int getNumberLength(int no){
 	}
 	
 	return numberLength;
+}
+
+void createManageSockets(int servingPort, int commandPort, char* rootDir, generalInfo* info){
+	//set of socket descriptors
+    fd_set readfds;
+	
+	//create socket for serving
+	int port, sock, newsock;
+	struct sockaddr_in server, client;
+	socklen_t clientlen;
+	struct sockaddr *serverptr=(struct sockaddr *)&server;
+	struct sockaddr *clientptr=(struct sockaddr *)&client;
+	struct hostent *rem;
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		perror("socket");
+	server.sin_family = AF_INET; 						// Internet domain
+	server.sin_addr.s_addr = htonl(INADDR_ANY);
+	server.sin_port = htons(servingPort); 						// The given port
+	if (bind(sock, serverptr, sizeof(server)) < 0){		// Bind socket to address
+		perror("bind");
+		exit(1);
+	}
+	if (listen(sock, 5) < 0){
+		perror("listen");
+		exit(1);
+	}
+	
+	//create socket for command
+	struct sockaddr_in serverCommand;
+	struct sockaddr *serverCommandPtr=(struct sockaddr *)&serverCommand;
+	int sockCommand;
+	if ((sockCommand = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		perror("socket command");
+	serverCommand.sin_family = AF_INET; 						// Internet domain
+	serverCommand.sin_addr.s_addr = htonl(INADDR_ANY);
+	serverCommand.sin_port = htons(commandPort); 						// The given port
+	if (bind(sockCommand, serverCommandPtr, sizeof(serverCommand)) < 0){		// Bind socket to address
+		perror("bind");
+		exit(1);
+	}
+	if (listen(sockCommand, 5) < 0){
+		perror("listen");
+		exit(1);
+	}
+	
+	int maxSd;
+	int whileFlag = 1;
+	while (whileFlag) { 
+		//clear the socket set
+        FD_ZERO(&readfds);
+		
+		//add server socket to set
+        FD_SET(sock, &readfds);
+        FD_SET(sockCommand, &readfds);
+		maxSd = sockCommand;
+		
+		//wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
+        int activity = select( maxSd + 1 , &readfds , NULL , NULL , NULL);
+    
+        if ((activity < 0) && (errno!=EINTR)) 
+        {
+            printf("select error");
+        }
+		
+		 //If something happened on the master socket , then its an incoming connection
+        if (FD_ISSET(sock, &readfds)) 
+        {
+            clientlen = sizeof(client);
+			if ((newsock = accept(sock, clientptr, &clientlen))< 0){ 	// accept connection
+				perror("accept");
+				exit(1);
+			}
+			if ((rem = gethostbyaddr((char *) &client.sin_addr.s_addr, sizeof(client.sin_addr.s_addr), client.sin_family)) == NULL){		// Find client's name
+				herror("gethostbyaddr"); 
+				exit(1);
+			}
+			readGetLinesFromCrawler(newsock,rootDir,info);
+		}else if(FD_ISSET(sockCommand, &readfds)){
+			clientlen = sizeof(client);
+			if ((newsock = accept(sockCommand, clientptr, &clientlen)) < 0){ 	// accept connection
+				perror("accept");
+				exit(1);
+			}
+			whileFlag = readFromCommandPort(newsock, info);
+		}
+	}
+	printf("Closing connection.\n");
+	close(sock);
+	close(newsock); 				
+	close(sockCommand);
+}
+
+int readFromCommandPort(int newsock, generalInfo* info){
+	char* buffer = malloc(11*sizeof(char));
+	if(read(newsock, buffer, 10) < 0){
+		perror("read");
+		exit(1);
+	}
+	int length = strlen(buffer);
+	buffer[length-2] = '\0';
+	if(strcmp(buffer,"STATS")==0){
+		printStats(info);
+	}else if(strcmp(buffer,"SHUTDOWN")==0){
+		free(buffer);
+		return 0;
+	}
+	free(buffer);
 }
