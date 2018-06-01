@@ -43,12 +43,17 @@ int main (int argc,char* argv[]){
 	//create linksQueue
 	linksQueue* queue = createLinksQueue();
 	char* link = convertToLink(startingUrl);
-	pushLinksQueue(queue,link);
+	createdLinks* created = createCreatedLinks();
+	pushLinksQueue(queue,link,created);
+	free(link);
+	link = NULL;
 	
 	//read lines and send to server
-	readGetLinesFromServer(queue,hostIP,sock,saveDir);
+	readGetLinesFromServer(queue,hostIP,sock,saveDir,created);
 	
+	destroyCreatedLinks(&created);
 	destroyLinksQueue(&queue);
 	close(sock);
+	
 	return 0;
 }

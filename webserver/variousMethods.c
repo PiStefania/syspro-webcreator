@@ -15,16 +15,12 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 		for(int i=0; i<argc; i++){
 			if(strcmp(argv[i],"-p")==0){
 				*servingPort=atoi(argv[i+1]);
-				printf("servingPort: %d\n",*servingPort);
 			}if(strcmp(argv[i],"-c")==0){
 				*commandPort=atoi(argv[i+1]);
-				printf("commandPort: %d\n",*commandPort);
 			}if(strcmp(argv[i],"-t")==0){
 				*numThreads=atoi(argv[i+1]);
-				printf("numThreads: %d\n",*numThreads);
 			}if(strcmp(argv[i],"-d")==0){
 				*rootDir=argv[i+1];
-				printf("rootDir: %s\n",*rootDir);
 			}
 		}
 	}
@@ -90,8 +86,10 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 		int checkRequest = checkRequestInfo(buffer,&file);
 		if(file == NULL){
 			printf("NO FILE GIVEN\n");
+			break;
 		}else if(!checkRequest){
 			printf("WRONG INPUT\n");
+			break;
 		}
 		else{	//get answer for request
 			int fullLength = strlen(file) + strlen(rootDir) + 2;
@@ -104,6 +102,7 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 			fullPath = NULL;
 		}
 				
+		if(response != NULL){
 		int lengthResponse = strlen(response);
 		//initially write size of answer in socket
 		if(write(newsock, &lengthResponse, sizeof(int)) < 0){
@@ -112,32 +111,33 @@ void readGetLinesFromCrawler(int newsock,char* rootDir){
 		}
 		
 		int div = lengthResponse / DEF_BUFFER_SIZE;
-		if(div>1){
-			int bef = 0;
-			for(int i=0;i<=div;i++){
-				if(i==div){
-					if(write(newsock, response + bef, lengthResponse-bef) < 0){
-						perror("write last part");
-						exit(1);
+			if(div>1){
+				int bef = 0;
+				for(int i=0;i<=div;i++){
+					if(i==div){
+						if(write(newsock, response + bef, lengthResponse-bef) < 0){
+							perror("write last part");
+							exit(1);
+						}
+					}else{
+						if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
+							perror("write part");
+							exit(1);
+						}
 					}
-				}else{
-					if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
-						perror("write part");
-						exit(1);
-					}
+					bef += DEF_BUFFER_SIZE;
 				}
-				bef += DEF_BUFFER_SIZE;
+			}else{
+				if(write(newsock, response, lengthResponse) < 0){
+					perror("write");
+					exit(1);
+				}
 			}
-		}else{
-			if(write(newsock, response, lengthResponse) < 0){
-				perror("write");
-				exit(1);
-			}
+			free(file);
+			file = NULL;
+			free(response);
+			response = NULL;
 		}
-		free(file);
-		file = NULL;
-		free(response);
-		response = NULL;
 	}
 }
 

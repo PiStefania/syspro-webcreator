@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "linksQueue.h"
+#define DEF_CREATED_SIZE 5
 
 linksQueue* createLinksQueue(){
 	linksQueue* queue = malloc(sizeof(linksQueue));
@@ -11,22 +12,24 @@ linksQueue* createLinksQueue(){
 	return queue;
 }
 
-void pushLinksQueue(linksQueue* queue,char* link){
-	if(queue->size==0 || queue->first == NULL){
-		queue->first = malloc(sizeof(linkNode));
-		queue->first->link = malloc((strlen(link)+1)*sizeof(char));
-		queue->first->next = NULL;
-		strcpy(queue->first->link,link);
-		queue->last = queue->first;
-		queue->size++;
-	}else{
-		if(!checkIfExistsLinksQueue(queue,link)){
+void pushLinksQueue(linksQueue* queue,char* link, createdLinks* created){
+	if(binaryCheckCreated(created, link) == -1){
+		if(queue->size==0 || queue->first == NULL){
+			queue->first = malloc(sizeof(linkNode));
+			queue->first->link = malloc((strlen(link)+1)*sizeof(char));
+			queue->first->next = NULL;
+			strcpy(queue->first->link,link);
+			queue->last = queue->first;
+			queue->size++;
+			insertCreatedLinks(created,link);
+		}else{
 			queue->last->next = malloc(sizeof(linkNode));
 			queue->last->next->link = malloc((strlen(link)+1)*sizeof(char));
 			queue->last->next->next = NULL;
 			strcpy(queue->last->next->link,link);
 			queue->last = queue->last->next;
 			queue->size++;
+			insertCreatedLinks(created,link);
 		}
 	}
 }
@@ -59,6 +62,7 @@ void destroyLinksQueue(linksQueue** queue){
 void destroyLinkNode(linkNode** node){
 	free((*node)->link);
 	(*node)->link = NULL;
+	(*node)->next = NULL;
 	free(*node);
 	*node = NULL;
 }
@@ -69,21 +73,6 @@ int isEmptyLinksQueue(linksQueue* queue){
 		return 1;
 	}
 	return 0;
-}
-
-int checkIfExistsLinksQueue(linksQueue* queue, char* link){
-	linkNode* temp = queue->first;
-	if(temp == NULL)
-		return 0;
-	else{
-		while(temp != NULL){
-			if(strcmp(temp->link,link)==0){
-				return 1;
-			}
-			temp = temp->next;
-		}
-		return 0;
-	}
 }
 
 void printLinksQueue(linksQueue* queue){
@@ -122,7 +111,7 @@ char* createRequest(char* link, char* host){
 	return request;
 }
 
-void insertLinksQueueContent(linksQueue* queue, char* content, char* site){
+void insertLinksQueueContent(linksQueue* queue, char* content, char* site, createdLinks* created){
 	char* resultStart = NULL;
 	do{
 		char* linkStart = "<a href=";
@@ -151,12 +140,130 @@ void insertLinksQueueContent(linksQueue* queue, char* content, char* site){
 			newPage = malloc((strlen(page)+strlen(site)+3)*sizeof(char));
 			sprintf(newPage,"/%s/%s",site,page);
 		}
-		//printf("new Page: %s\n",newPage);
 		//insert new page to queue
-		pushLinksQueue(queue,newPage);
+		pushLinksQueue(queue,newPage,created);
 		free(newPage);
 		newPage = NULL;
 		content = resultEnd + strlen(linkEnd);
 	} while(resultStart != NULL);
+}
 
+createdLinks* createCreatedLinks(){
+	createdLinks* created = malloc(sizeof(createdLinks));
+	created->size = DEF_CREATED_SIZE;
+	created->position = 0;
+	created->createdArray = malloc(created->size*sizeof(char*));
+	for(int i=0;i<created->size;i++){
+		created->createdArray[i] = NULL;
+	}
+	return created;
+}
+
+void doubleCreatedLinks(createdLinks* created){
+	int oldSize = created->size;
+	int newSize = oldSize + 5;
+	created->createdArray = realloc(created->createdArray,newSize*sizeof(char*));
+	for(int i=oldSize;i<newSize;i++){
+		created->createdArray[i] = NULL;
+	}
+	created->size = newSize;
+}
+
+void insertCreatedLinks(createdLinks* created, char* link){
+	int getPosition = binarySearchCreatedLinks(created,link);
+	//full array
+	if(created->position == created->size-1){
+		doubleCreatedLinks(created);
+	}
+	
+	if(created->position == 0){
+		//empty
+		created->createdArray[0] = malloc((strlen(link)+1)*sizeof(char));
+		strcpy(created->createdArray[0],link);
+		created->position++;
+	}else{
+		//same id
+		if(created->createdArray[getPosition] != NULL){
+			if(strcmp(link,created->createdArray[getPosition]) != 0){
+				//need to shift other elements to insert a new node
+				int fullMoveSize = (created->position - getPosition)*sizeof(created->createdArray[created->position]);
+				memmove(&(created->createdArray[getPosition+1]), &(created->createdArray[getPosition]), fullMoveSize);
+				created->createdArray[getPosition] = malloc((strlen(link)+1)*sizeof(char));
+				strcpy(created->createdArray[getPosition],link);
+				created->position++;
+			}
+		}else{
+			created->createdArray[getPosition] = malloc((strlen(link)+1)*sizeof(char));
+			strcpy(created->createdArray[getPosition],link);
+			created->position++;
+		}
+	}
+}
+
+int binarySearchCreatedLinks(createdLinks* created, char* link){
+	int first = 0;
+	int last = created->position;
+	if(last == 0)
+		return 0;
+	int mid = 0;
+	char** array = created->createdArray;
+	while (first < last){
+        int mid = first + (last-first)/2;
+        if(strcmp(array[mid],link) == 0)
+            return mid;
+        if (strcmp(array[mid],link) < 0)
+            first = mid + 1;
+		else
+            last = mid - 1;
+    }
+	if(last<=first){
+		if(array[first]!=NULL){
+			if(0 < strcmp(link,array[first]))
+				return first+1;
+			else
+				return first;
+		}else{
+			return first;
+		}
+	}
+    return mid;
+}
+
+int binaryCheckCreated(createdLinks* created, char* link){
+	int first = 0;
+	int last = created->position-1;
+	if(last == 0)
+		return -1;
+	int mid = 0;
+	char** array = created->createdArray;
+	while (first <= last){
+        int mid = first + (last-first)/2;
+        if(strcmp(array[mid],link) == 0){
+            return mid;
+		}
+        if (strcmp(array[mid],link) < 0)
+            first = mid + 1;
+		else
+            last = mid - 1;
+    }
+    return -1;
+}
+	
+void printCreatedLinks(createdLinks* created){
+	for(int i=0;i<created->position;i++){
+		printf("Created: '%s'\n",created->createdArray[i]);
+	}
+}
+	
+void destroyCreatedLinks(createdLinks** created){
+	for(int i=0;i<(*created)->position;i++){
+		if((*created)->createdArray[i] != NULL){
+			free((*created)->createdArray[i]);
+			(*created)->createdArray[i] = NULL;
+		}
+	}
+	free((*created)->createdArray);
+	(*created)->createdArray = NULL;
+	free(*created);
+	*created = NULL;
 }

@@ -38,18 +38,20 @@ int main (int argc,char* argv[]){
 		exit(1);
 	}
 	//printf("Listening for connections to port %d\n", port);		//Listen for connections
-	while (1) { 
+	int flagListen = 1;
+	while (flagListen) { 
 		clientlen = sizeof(client);
 		if ((newsock = accept(sock, clientptr, &clientlen))< 0){ 	// accept connection
 			perror("accept");
 			exit(1);
+		}else{
+			if ((rem = gethostbyaddr((char *) &client.sin_addr.s_addr, sizeof(client.sin_addr.s_addr), client.sin_family)) == NULL){		// Find client's name
+				herror("gethostbyaddr"); 
+				exit(1);
+			}
+			readGetLinesFromCrawler(newsock,rootDir);
+			break;
 		}
-		if ((rem = gethostbyaddr((char *) &client.sin_addr.s_addr, sizeof(client.sin_addr.s_addr), client.sin_family)) == NULL){		// Find client's name
-			herror("gethostbyaddr"); 
-			exit(1);
-		}
-		
-		readGetLinesFromCrawler(newsock,rootDir);
 	}
 	printf("Closing connection.\n");
 	close(sock);

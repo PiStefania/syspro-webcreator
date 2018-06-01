@@ -15,23 +15,17 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 		for(int i=0; i<argc; i++){
 			if(strcmp(argv[i],"-h")==0){
 				*hostIP=argv[i+1];
-				printf("hostIP: %s\n",*hostIP);
 			}if(strcmp(argv[i],"-p")==0){
 				*port=atoi(argv[i+1]);
-				printf("port: %d\n",*port);
 			}if(strcmp(argv[i],"-c")==0){
 				*commandPort=atoi(argv[i+1]);
-				printf("commandPort: %d\n",*commandPort);
 			}if(strcmp(argv[i],"-t")==0){
 				*numThreads=atoi(argv[i+1]);
-				printf("numThreads: %d\n",*numThreads);
 			}if(strcmp(argv[i],"-d")==0){
 				*saveDir=argv[i+1];
-				printf("saveDir: %s\n",*saveDir);
 			}
 		}
 		*startingUrl = argv[argc-1];
-		printf("startingUrl: %s\n",*startingUrl);
 	}
 	else{
 		printf("Wrong number of arguments. Terminate process.\n");
@@ -83,17 +77,15 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 	}
 }
 
-void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* saveDir){
+void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* saveDir, createdLinks* created){
 	int chars=0;
 	int requestFlag = 1;
-	int init = 0;
-	while(1){
+	int whileFlag = 1;
+	while(whileFlag){
 		char* fileName = NULL;
 		if(!isEmptyLinksQueue(queue) && requestFlag){
 			linkNode* node = popLinksQueue(queue);
 			char* request = createRequest(node->link, host);
-			printf("REQUEST\n'%s'\n",request);
-			printLinksQueue(queue);
 			fileName = malloc((strlen(node->link)+1)*sizeof(char));
 			strcpy(fileName,node->link);
 			destroyLinkNode(&node);
@@ -109,6 +101,9 @@ void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* sav
 			requestFlag = 0;
 			free(request);
 			request = NULL;
+		}
+		else if(isEmptyLinksQueue(queue)){
+			whileFlag = 0;
 		}
 
 		if(!requestFlag){
@@ -157,8 +152,7 @@ void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* sav
 			char* content = createFileSaveDir(saveDir,responseBuffer,fileName);
 			//insert links from content to queue
 			char* site = strtok(fileName,"/");
-			insertLinksQueueContent(queue,content,site);
-			printLinksQueue(queue);
+			insertLinksQueueContent(queue,content,site,created);
 			requestFlag = 1;
 			free(responseBuffer);
 			responseBuffer = NULL;
