@@ -4,11 +4,12 @@
 typedef struct generalInfo{
 	int millis;
 	long startTime;
-	int pagesServed;
-	long bytesServed;
+	int pagesDownloaded;
+	long bytesDownloaded;
 }generalInfo;
 
 generalInfo* createGeneralInfo();
-void printStats(generalInfo* info, int newsock);
+void printStats(generalInfo* info, int socket);
+void executeJobExecutor(char* searchWords, char* docFile);
 
 #endif

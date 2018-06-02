@@ -248,25 +248,27 @@ void createManageSockets(int servingPort, int commandPort, char* rootDir, genera
 			whileFlag = readFromCommandPort(newsock, info);
 		}
 	}
-	printf("Closing connection.\n");
+	printf("Closing connections.\n");
 	close(sock);
 	close(newsock); 				
 	close(sockCommand);
 }
 
 int readFromCommandPort(int newsock, generalInfo* info){
-	char* buffer = malloc(11*sizeof(char));
-	if(read(newsock, buffer, 10) < 0){
-		perror("read");
-		exit(1);
+	char ch;
+	char buffer[10];
+	int i=0;
+	while(read(newsock, &ch, 1) > 0){
+		if(ch == '\n')
+			break;
+		buffer[i] = ch;
+		i++;
 	}
-	int length = strlen(buffer);
-	buffer[length-2] = '\0';
+	buffer[i-1] = '\0';
 	if(strcmp(buffer,"STATS")==0){
-		printStats(info);
+		printStats(info,newsock);
 	}else if(strcmp(buffer,"SHUTDOWN")==0){
-		free(buffer);
 		return 0;
 	}
-	free(buffer);
+	return 1;
 }

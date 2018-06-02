@@ -1,5 +1,5 @@
 webcreator:	./webcreator.sh root_directory dataset.txt 3 3
 webserver:  ./myhttpd -p 8080 -c 9090 -t 4 -d ../webcreator/root_directory/
-webcrawler:. ./mycrawler -h 192.168.1.10 -p 8080 -c 9090 -t 4 -d ./save_dir http://192.168.1.10:8080/site0/page0_24040.html
+webcrawler:. ./mycrawler -h 192.168.1.10 -p 8080 -c 7070 -t 4 -d ./save_dir http://192.168.1.10:8080/site0/page0_24040.html
 
 find host or ip: hostname -I
