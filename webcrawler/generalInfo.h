@@ -10,6 +10,6 @@ typedef struct generalInfo{
 
 generalInfo* createGeneralInfo();
 void printStats(generalInfo* info, int socket);
-void executeJobExecutor(char* searchWords, char* docFile);
+void executeJobExecutor(char* searchWords, char* saveDir, int socket);
 
 #endif

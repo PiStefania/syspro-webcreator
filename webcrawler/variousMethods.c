@@ -312,7 +312,7 @@ int readFromCommandPort(int socket, generalInfo* info, char* saveDir){
 		char* token = strtok(buffer," ");
 		if(strcmp(token,"SEARCH")==0){
 			token = strtok(NULL,"");
-			executeJobExecutor(token, saveDir);
+			executeJobExecutor(token, saveDir,socket);
 		}
 	}
 	return 1;

@@ -5,6 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <math.h>
+#include <dirent.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 #include "generalInfo.h"
 
 generalInfo* createGeneralInfo(){
@@ -62,24 +65,110 @@ void printStats(generalInfo* info, int socket){
 	buffer = NULL;
 }
 
-void executeJobExecutor(char* searchWords, char* docFile){
-	printf("searchWords: '%s'\n",searchWords);
-	char** words = malloc(10*sizeof(char*));
-	for(int j=0;j<10;j++){
-		words[j] = NULL;
-	}
-	char* token = strtok(searchWords," ");
-	int i=1;
-	while(i<10){
-		words[i-1] = malloc((strlen(token)+2)*sizeof(char));
-		strcpy(words[i-1],token);
-		printf("words[%d]: '%s'\n",i-1,words[i-1]);
-		token = strtok(NULL," ");
-		i++;
+void executeJobExecutor(char* searchWords, char* saveDir, int socket){
+	if(searchWords == NULL){
+		printf("NO SEARCH WORDS FOUND\n");
+		return;
 	}
 	
-	//call jobExecutor
-	char *args[]={"../jobExecutor/jobExecutor","-d",docFile,"-w","10"};
-    execvp(args[0],args);
+	char* writeBuf = malloc((strlen("/search ") + strlen("\n/exit\n") + strlen(searchWords) + strlen(" -d 100") + 1)*sizeof(char));
+	sprintf(writeBuf,"/search %s -d 100\n/exit\n",searchWords);
+	printf("writebuf: '%s'\n",writeBuf);
+	//overwrite .
+	char* saveD = malloc((strlen(saveDir)+1)*sizeof(char));
+	strcpy(saveD,saveDir);
+	memmove(saveD,saveD+1,strlen(saveD)-1);
+	saveD[strlen(saveD)-1] = '\0';
+	//create docFile from scratch
+	system("rm -rf docfile");
+	FILE *fp = fopen("docfile","w");
+	if(fp != NULL){
+		DIR* dir;
+		struct dirent *ent;
+		if((dir=opendir(saveDir)) != NULL){
+			while (( ent = readdir(dir)) != NULL){
+				if(ent->d_type == DT_DIR && strcmp(ent->d_name, ".") != 0  && strcmp(ent->d_name, "..") != 0){
+					//write to docfile
+					char* subdirPath = malloc((strlen(saveD)+strlen("../webcrawler")+strlen(ent->d_name)+4)*sizeof(char));
+					sprintf(subdirPath,"../webcrawler%s/%s/\n",saveD,ent->d_name);
+					fwrite(subdirPath,1,strlen(subdirPath),fp);
+					//free subdirPath
+					free(subdirPath);
+					subdirPath = NULL;
+				}
+			}
+			closedir(dir);
+		}
+		fclose(fp);
+		
+		//call jobExecutor
+		int pipesRead[2];
+		int pipesWrite[2];
+		if (pipe(pipesRead) == -1) {
+			perror("pipe");
+			exit(1);
+		}
+		if (pipe(pipesWrite) == -1) {
+			perror("pipe");
+			exit(1);
+		}
+		pid_t childpid = fork();
+		int status;
+		if(childpid < 0){
+			perror("fork");
+		}
+		else if(childpid == 0){
+			//child -> replace stdin with pipesRead[0]
+			close(pipesRead[1]);
+			dup2(pipesRead[0],STDIN_FILENO);    
+        	close(pipesRead[0]);
+			
+			//child -> replace stdout with pipesWrite[1]
+			close(pipesWrite[0]);
+			dup2(pipesWrite[1],STDOUT_FILENO);    
+        	close(pipesWrite[1]);
+			
+			//execute program
+			char *args[]={"../jobExecutor/jobExecutor","-d","../webcrawler/docfile","-w","10",NULL};
+			execv(args[0],args);
+			perror("execv");
+		}
+		else{
+			//parent -> write to stdin of child
+            write(pipesRead[1], writeBuf, strlen(writeBuf));
+        	close(pipesRead[1]); 
+			close(pipesRead[0]);
+			
+			//parent -> get stdout of child
+			while(1){
+				int lengthMes = 0;
+				int n;
+				if(read(pipesWrite[0],&lengthMes,sizeof(int)) > 0){
+					printf("lengthMes: %d\n",lengthMes);
+					char readBuf[lengthMes]; 
+					if(read(pipesWrite[0],readBuf,lengthMes) > 0){
+						readBuf[lengthMes] = '\0';
+						printf("rr: '%s'\n",readBuf);
+						//write to socket
+						write(socket,readBuf,lengthMes);
+					}
+				}else{
+					printf("End\n");
+					break;
+				}
+			}
+			close(pipesWrite[0]);
+			close(pipesWrite[1]);
+			//wait for jobexecutor to finish
+			waitpid(childpid,&status,0);
+		}
+	}else{
+		printf("Error with creating/opening file\n");
+	}
 	
+	//free vars
+	free(saveD);
+	saveD = NULL;
+	free(writeBuf);
+	writeBuf = NULL;
 }
