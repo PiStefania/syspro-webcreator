@@ -15,6 +15,7 @@
 #include "httpRequests.h"
 #include "generalInfo.h"
 #define DEF_BUFFER_SIZE 4096
+#define LISTEN_SIZE 128
 
 
 //specifies whether or not the arguments given are correct
@@ -164,7 +165,7 @@ int getNumberLength(int no){
 	return numberLength;
 }
 
-void createManageSockets(int servingPort, int commandPort, char* rootDir, generalInfo* info){
+void createManageSockets(int servingPort, int commandPort, threads* th){
 	//set of socket descriptors
     fd_set readfds;
 	
@@ -184,7 +185,7 @@ void createManageSockets(int servingPort, int commandPort, char* rootDir, genera
 		perror("bind");
 		exit(1);
 	}
-	if (listen(sock, 5) < 0){
+	if (listen(sock, LISTEN_SIZE) < 0){
 		perror("listen");
 		exit(1);
 	}
@@ -202,7 +203,7 @@ void createManageSockets(int servingPort, int commandPort, char* rootDir, genera
 		perror("bind");
 		exit(1);
 	}
-	if (listen(sockCommand, 5) < 0){
+	if (listen(sockCommand, LISTEN_SIZE) < 0){
 		perror("listen");
 		exit(1);
 	}
@@ -238,23 +239,25 @@ void createManageSockets(int servingPort, int commandPort, char* rootDir, genera
 				herror("gethostbyaddr"); 
 				exit(1);
 			}
-			readGetLinesFromCrawler(newsock,rootDir,info);
+			
+			//insert fd to poolData
+			insertPoolData(th,newsock);
+			pthread_cond_signal(&(th->notEmpty));
 		}else if(FD_ISSET(sockCommand, &readfds)){
 			clientlen = sizeof(client);
 			if ((newsock = accept(sockCommand, clientptr, &clientlen)) < 0){ 	// accept connection
 				perror("accept");
 				exit(1);
 			}
-			whileFlag = readFromCommandPort(newsock, info);
+			whileFlag = readFromCommandPort(newsock,th);
 		}
 	}
 	printf("Closing connections.\n");
 	close(sock);
-	close(newsock); 				
 	close(sockCommand);
 }
 
-int readFromCommandPort(int newsock, generalInfo* info){
+int readFromCommandPort(int newsock, threads* th){
 	char ch;
 	char buffer[10];
 	int i=0;
@@ -266,8 +269,8 @@ int readFromCommandPort(int newsock, generalInfo* info){
 	}
 	buffer[i-1] = '\0';
 	if(strcmp(buffer,"STATS")==0){
-		printStats(info,newsock);
-	}else if(strcmp(buffer,"SHUTDOWN")==0){
+		printStats(th->info,newsock);
+	}else if(strcmp(buffer,"SHUTDOWN")==0){		
 		return 0;
 	}
 	return 1;

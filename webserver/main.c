@@ -4,6 +4,7 @@
 #include <sys/timeb.h>
 #include "variousMethods.h"
 #include "generalInfo.h"
+#include "threadPool.h"
 
 
 int main (int argc,char* argv[]){
@@ -15,13 +16,21 @@ int main (int argc,char* argv[]){
 	info->startTime = before.time;
 	info->millis = before.millitm;
 	
+	
 	//check arguments
 	int servingPort=0,commandPort=0,numThreads=0;
 	char* rootDir = NULL;
 	pickArgumentsMain(argc,argv,&servingPort,&commandPort,&numThreads,&rootDir);
-	createManageSockets(servingPort, commandPort, rootDir, info);
+	
+	//create threads
+	threads* th = initializeThreads(numThreads,info,rootDir);
+	
+	//manage sockets
+	createManageSockets(servingPort, commandPort, th);
 	
 	free(info);
 	info = NULL;
+	
+	//destroyThreads(&th);
 	return 0;
 }

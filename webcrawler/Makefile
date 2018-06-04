@@ -1,8 +1,8 @@
-CC = gcc -g -lm
-FILES = main.c variousMethods.c linksQueue.c generalInfo.c
-OBJECTS = main.o variousMethods.o linksQueue.o generalInfo.o
+CC = gcc -g -lm -pthread
+FILES = main.c variousMethods.c linksQueue.c generalInfo.c threadPool.c
+OBJECTS = main.o variousMethods.o linksQueue.o generalInfo.o threadPool.o
 OUT = mycrawler
-HEADERS = variousMethods.h linksQueue.h generalInfo.h
+HEADERS = variousMethods.h linksQueue.h generalInfo.h threadPool.h
 
 all: $(OBJECTS) $(HEADERS)
 	$(CC) -o $(OUT) $(FILES) -lm
@@ -20,6 +20,9 @@ linksQueue.o: linksQueue.c
 	
 generalInfo.o: generalInfo.c
 	$(CC) -c generalInfo.c
+	
+threadPool.o: threadPool.c
+	$(CC) -c threadPool.c
 	
 subsystem:
 	cd ../jobExecutor && $(MAKE)

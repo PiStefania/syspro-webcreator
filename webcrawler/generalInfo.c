@@ -8,7 +8,11 @@
 #include <dirent.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <poll.h>
 #include "generalInfo.h"
+#define POLL_MILLI 2000
 
 generalInfo* createGeneralInfo(){
 	generalInfo* info = malloc(sizeof(generalInfo));
@@ -71,9 +75,46 @@ void executeJobExecutor(char* searchWords, char* saveDir, int socket){
 		return;
 	}
 	
-	char* writeBuf = malloc((strlen("/search ") + strlen("\n/exit\n") + strlen(searchWords) + strlen(" -d 100") + 1)*sizeof(char));
-	sprintf(writeBuf,"/search %s -d 100\n/exit\n",searchWords);
-	printf("writebuf: '%s'\n",writeBuf);
+	//check for tags and create string for search and exit
+	char** words = malloc(10*sizeof(char*));
+	for(int j=0;j<10;j++){
+		words[j] = NULL;
+	}
+	char* token = strtok(searchWords," ");
+	int i=1;
+	while(i<10){
+		if(token != NULL){
+			if(token[0] == '<' && token[strlen(token)-1] == '>'){
+				token = strtok(NULL," \t");
+				continue;
+			}
+			words[i-1] = malloc((strlen(token)+2)*sizeof(char));
+			strcpy(words[i-1],token);
+			token = strtok(NULL," \t");
+			i++;
+		}else
+			break;
+	}
+	
+	int max = i-1;
+	int fullLength = 0;
+	for(int i=0;i<max;i++){
+		fullLength += strlen(words[i]);
+	}
+	fullLength += max+1;
+	char* writeBufSearchWords = malloc(fullLength*sizeof(char));
+	for(int i=0;i<max;i++){
+		if(i == 0)
+			strcpy(writeBufSearchWords,words[i]);
+		else{
+			strcat(writeBufSearchWords," ");
+			strcat(writeBufSearchWords,words[i]);
+		}
+	}
+	
+	char* writeBuf = malloc((strlen(writeBufSearchWords) + strlen("/search ") + strlen(" -d 100\n/exit\n") + 2)*sizeof(char));
+	sprintf(writeBuf,"/search %s -d 100\n/exit\n",writeBufSearchWords);
+	writeBuf[strlen(writeBuf)] = '\0';
 	//overwrite .
 	char* saveD = malloc((strlen(saveDir)+1)*sizeof(char));
 	strcpy(saveD,saveDir);
@@ -112,6 +153,12 @@ void executeJobExecutor(char* searchWords, char* saveDir, int socket){
 			perror("pipe");
 			exit(1);
 		}
+		//unblock read pipe
+    	if (fcntl(pipesWrite[0], F_SETFL, O_NONBLOCK) < 0){
+			perror("pipe");
+			exit(2);
+		}
+		
 		pid_t childpid = fork();
 		int status;
 		if(childpid < 0){
@@ -138,22 +185,19 @@ void executeJobExecutor(char* searchWords, char* saveDir, int socket){
             write(pipesRead[1], writeBuf, strlen(writeBuf));
         	close(pipesRead[1]); 
 			close(pipesRead[0]);
-			
 			//parent -> get stdout of child
+			int lengthMes = 0;
 			while(1){
-				int lengthMes = 0;
-				int n;
-				if(read(pipesWrite[0],&lengthMes,sizeof(int)) > 0){
-					printf("lengthMes: %d\n",lengthMes);
-					char readBuf[lengthMes]; 
-					if(read(pipesWrite[0],readBuf,lengthMes) > 0){
-						readBuf[lengthMes] = '\0';
-						printf("rr: '%s'\n",readBuf);
-						//write to socket
-						write(socket,readBuf,lengthMes);
+				if(poll(&(struct pollfd){ .fd = pipesWrite[0], .events = POLLIN }, 1, POLL_MILLI) > 0){
+					if(read(pipesWrite[0],&lengthMes,sizeof(int)) > 0){
+						char readBuf[lengthMes]; 
+						if(read(pipesWrite[0],readBuf,lengthMes) > 0){
+							readBuf[lengthMes] = '\0';
+							//write to socket
+							write(socket,readBuf,lengthMes);
+						}
 					}
 				}else{
-					printf("End\n");
 					break;
 				}
 			}
@@ -171,4 +215,14 @@ void executeJobExecutor(char* searchWords, char* saveDir, int socket){
 	saveD = NULL;
 	free(writeBuf);
 	writeBuf = NULL;
+	free(writeBufSearchWords);
+	writeBufSearchWords = NULL;
+	for(int j=0;j<10;j++){
+		if(words[j] != NULL){
+			free(words[j]);
+			words[j] = NULL;
+		}
+	}
+	free(words);
+	words = NULL;
 }
