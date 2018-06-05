@@ -15,7 +15,10 @@
 #include <errno.h>
 #include "variousMethods.h"
 #include "linksQueue.h"
+#include "threadPool.h"
 #define DEF_BUFFER_SIZE 4096
+#define LISTEN_SIZE 128
+
 
 //specifies whether or not the arguments given are correct
 void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* commandPort,int* numThreads,char** saveDir,char** startingUrl){
@@ -86,92 +89,83 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 	}
 }
 
-void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* saveDir, createdLinks* created, generalInfo* info){
+void readGetLinesFromServer(int socket, threads* th){
 	int chars=0;
-	int requestFlag = 1;
-	int whileFlag = 1;
-	while(whileFlag){
-		char* fileName = NULL;
-		if(!isEmptyLinksQueue(queue) && requestFlag){
-			linkNode* node = popLinksQueue(queue);
-			char* request = createRequest(node->link, host);
-			fileName = malloc((strlen(node->link)+1)*sizeof(char));
-			strcpy(fileName,node->link);
-			destroyLinkNode(&node);
-			chars = strlen(request);
-			if(write(socket, &chars, sizeof(int)) < 0){
-				perror("write size of lines");
-				exit(1);
-			}
-			if(write(socket, request, chars) < 0){
-				perror("write lines");
-				exit(1);
-			}
-			requestFlag = 0;
-			free(request);
-			request = NULL;
-		}
-		else if(isEmptyLinksQueue(queue)){
-			whileFlag = 0;
-		}
+	char* fileName = NULL;
+	linkNode* node = popFromQueue(th);
+	char* request = createRequest(node->link, th->hostIP);
+	printf("REQUEST: %s\n",request);
+	fileName = malloc((strlen(node->link)+1)*sizeof(char));
+	strcpy(fileName,node->link);
+	destroyLinkNode(&node);
+	chars = strlen(request);
+	if(write(socket, &chars, sizeof(int)) < 0){
+		perror("write size of lines");
+		exit(1);
+	}
+	if(write(socket, request, chars) < 0){
+		perror("write lines");
+		exit(1);
+	}
+	free(request);
+	request = NULL;
+	
+	int responseChars = 0;
+	if(read(socket, &responseChars, sizeof(int)) < 0){
+		perror("read chars");
+		exit(1);
+	}
 
-		if(!requestFlag){
-			info->pagesDownloaded++;
-			int responseChars = 0;
-			if(read(socket, &responseChars, sizeof(int)) < 0){
-				perror("read");
-				exit(1);
-			}
+	pthread_mutex_lock(&(th->lockAdditional));
+	th->info->pagesDownloaded++;
+	th->info->bytesDownloaded += responseChars;
+	pthread_mutex_unlock(&(th->lockAdditional));
 
-			info->bytesDownloaded += responseChars;
-			int div = responseChars / DEF_BUFFER_SIZE;
-			char* responseBuffer = malloc((responseChars+1)*sizeof(char));
-			if(div>1){
-				int size = 0;
-				char temp[DEF_BUFFER_SIZE];
-				for(int i=0;i<=div;i++){
-					if(i!=div){
-						if(read(socket, temp, DEF_BUFFER_SIZE) < 0){
-							perror("read");
-							exit(1);
-						}
-						temp[DEF_BUFFER_SIZE] = '\0';
-						if(i==0){
-							strcpy(responseBuffer,temp);
-						}else{
-							strcat(responseBuffer,temp);
-						}
-						size += DEF_BUFFER_SIZE;
-					}else{
-						char temp1[responseChars-size+1];
-						if(read(socket, temp1, responseChars-size) < 0){
-							perror("read");
-							exit(1);
-						}
-						temp1[responseChars-size] = '\0';
-						strcat(responseBuffer,temp1);
-					}
-				}
-			}else{
-				if(read(socket, responseBuffer, responseChars) < 0){
-					perror("read");
+	int div = responseChars / DEF_BUFFER_SIZE;
+	char* responseBuffer = malloc((responseChars+1)*sizeof(char));
+	if(div>1){
+		int size = 0;
+		char temp[DEF_BUFFER_SIZE];
+		for(int i=0;i<=div;i++){
+			if(i!=div){
+				if(read(socket, temp, DEF_BUFFER_SIZE) < 0){
+					perror("read part");
 					exit(1);
 				}
-			}
-
-			//insert content to new file
-			char* content = createFileSaveDir(saveDir,responseBuffer,fileName);
-			//insert links from content to queue
-			char* site = strtok(fileName,"/");
-			insertLinksQueueContent(queue,content,site,created);
-			requestFlag = 1;
-			free(responseBuffer);
-			responseBuffer = NULL;
-			if(fileName != NULL){
-				free(fileName);
-				fileName = NULL;
+				temp[DEF_BUFFER_SIZE] = '\0';
+				if(i==0){
+					strcpy(responseBuffer,temp);
+				}else{
+					strcat(responseBuffer,temp);
+				}
+				size += DEF_BUFFER_SIZE;
+			}else{
+				char temp1[responseChars-size+1];
+				if(read(socket, temp1, responseChars-size) < 0){
+					perror("read last part");
+					exit(1);
+				}
+				temp1[responseChars-size] = '\0';
+				strcat(responseBuffer,temp1);
 			}
 		}
+	}else{
+		if(read(socket, responseBuffer, responseChars) < 0){
+			perror("read whole");
+			exit(1);
+		}
+	}
+
+	//insert content to new file
+	char* content = createFileSaveDir(th->saveDir,responseBuffer,fileName);
+	//insert links from content to queue
+	char* site = strtok(fileName,"/");
+	insertLinksQueueContent(content,site,th);
+	free(responseBuffer);
+	responseBuffer = NULL;
+	if(fileName != NULL){
+		free(fileName);
+		fileName = NULL;
 	}
 }
 
@@ -199,40 +193,7 @@ char* createFileSaveDir(char* saveDir, char* response, char* fileName){
 	return content;
 }
 
-void createManageSockets(int servingPort, int commandPort, char* hostIP, char* startingUrl, char* saveDir, generalInfo* info){
-	//create socket and connect with server
-	int sock, i;
-	struct sockaddr_in server;
-	struct sockaddr *serverptr = (struct sockaddr*)&server;
-	struct hostent *rem;
-	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0){		// Create socket
-		perror("socket");
-		exit(1);
-	}
-	if ((rem = gethostbyname(hostIP)) == NULL){			// Find server address
-		herror("gethostbyname"); 
-		exit(1);
-	}
-	server.sin_family = AF_INET; 							// Internet domain 
-	memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
-	server.sin_port = htons(servingPort); 							// Server port 
-	
-	
-	//create linksQueue
-	linksQueue* queue = createLinksQueue();
-	char* link = convertToLink(startingUrl);
-	createdLinks* created = createCreatedLinks();
-	pushLinksQueue(queue,link,created);
-	free(link);
-	link = NULL;
-	
-	if (connect(sock, serverptr, sizeof(server)) < 0){		// Initiate connection 
-		perror("connect");
-		exit(1);
-	}
-	
-	//read lines and send to server
-	readGetLinesFromServer(queue,hostIP,sock,saveDir,created,info);
+void createManageSockets(int servingPort, int commandPort, threads* th){
 	
 	//create commands socket
 	socklen_t clientlen;
@@ -250,7 +211,7 @@ void createManageSockets(int servingPort, int commandPort, char* hostIP, char* s
 		perror("bind");
 		exit(1);
 	}
-	if (listen(sockCommand, 5) < 0){
+	if (listen(sockCommand, LISTEN_SIZE) < 0){
 		perror("listen");
 		exit(1);
 	}
@@ -268,14 +229,15 @@ void createManageSockets(int servingPort, int commandPort, char* hostIP, char* s
 	//add server socket to set
 	FD_SET(sockCommand, &readfds);
 	maxSd = sockCommand;
+	
 	while (whileFlag) { 
 		//wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
         int activity = select( maxSd + 1 , &readfds , NULL , NULL , NULL);
     
-        if ((activity < 0) && (errno!=EINTR)) 
-        {
-            printf("select error");
-        }
+		if ((activity < 0) && (errno!=EINTR)){
+			printf("select error");
+		}
+		
 		
        if(FD_ISSET(sockCommand, &readfds)){
 			clientlen = sizeof(client);
@@ -283,14 +245,12 @@ void createManageSockets(int servingPort, int commandPort, char* hostIP, char* s
 				perror("connect");
 				exit(1);
 			}
-			whileFlag = readFromCommandPort(newsock, info, saveDir);
+			whileFlag = readFromCommandPort(newsock, th->info, th->saveDir);
+			close(newsock);
 		}
 	}
 	printf("Closing connections.\n");
 	close(sockCommand);
-	close(newsock);
-	destroyCreatedLinks(&created);
-	destroyLinksQueue(&queue);
 }
 
 int readFromCommandPort(int socket, generalInfo* info, char* saveDir){

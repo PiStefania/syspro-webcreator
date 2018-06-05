@@ -21,9 +21,28 @@ int main (int argc,char* argv[]){
 	char* startingUrl = NULL;
 	pickArgumentsMain(argc,argv,&hostIP,&serverPort,&commandPort,&numThreads,&saveDir,&startingUrl);
 	
-	createManageSockets(serverPort, commandPort, hostIP, startingUrl, saveDir, info);
+	//create linksQueue
+	linksQueue* queue = createLinksQueue();
+	char* link = convertToLink(startingUrl);
+	createdLinks* created = createCreatedLinks();
 	
+	//create threads
+	threads* th = initializeThreads(numThreads,info,saveDir,startingUrl,hostIP,queue,created,serverPort);
+	
+	pthread_mutex_lock(&(th->lockData));
+	pushLinksQueue(link,th);
+	pthread_mutex_unlock(&(th->lockData));
+	free(link);
+	link = NULL;
+	
+	createManageSockets(serverPort, commandPort, th);
+	
+	destroyCreatedLinks(&created);
+	destroyLinksQueue(&queue);
 	free(info);
 	info = NULL;
+	
+	//destroyThreads(&th);
+	
 	return 0;
 }

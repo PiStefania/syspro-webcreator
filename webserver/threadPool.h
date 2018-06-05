@@ -16,6 +16,7 @@ typedef struct threads{
 	pthread_cond_t notEmpty;
 	pthread_cond_t notFull;
 	pthread_mutex_t lockData;
+	pthread_mutex_t lockAdditional;
 	poolData* data;
 	generalInfo* info;
 	char* rootDir;
@@ -26,6 +27,7 @@ poolData* initializePoolData();
 void insertPoolData(threads* th, int fd);
 int getPoolData(threads* th);
 void destroyPoolData(poolData** data);
+void printFDs(poolData* data);
 
 //functions for threads
 threads* initializeThreads(int numThreads, generalInfo* info, char* rootDir);

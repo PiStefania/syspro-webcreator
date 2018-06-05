@@ -4,31 +4,32 @@
 #include <pthread.h>
 #include "generalInfo.h"
 
-typedef struct poolData{
-	int* bufferFds;
-	int end;
-	int position;
-}poolData;
+typedef struct threads threads;
 
-typedef struct threads{
+#include "linksQueue.h"
+
+struct threads{
 	int noThreads;
 	pthread_t* tids; 				// execution threads
 	pthread_cond_t notEmpty;
 	pthread_cond_t notFull;
 	pthread_mutex_t lockData;
-	poolData* data;
+	pthread_mutex_t lockAdditional;
+	linksQueue* queue;
 	generalInfo* info;
-	char* rootDir;
-}threads;
+	char* saveDir;
+	char* startingUrl;
+	char* hostIP;
+	createdLinks* created;
+	int servingPort;
+};
 
 //functions for pool data
-poolData* initializePoolData();
-void insertPoolData(threads* th, int fd);
-int getPoolData(threads* th);
-void destroyPoolData(poolData** data);
+linkNode* popFromQueue(threads* th);
+void insertQueue(threads* th, char* link);
 
 //functions for threads
-threads* initializeThreads(int numThreads, generalInfo* info, char* rootDir);
+threads* initializeThreads(int numThreads, generalInfo* info, char* saveDir, char* startingUrl, char* hostIP, linksQueue* queue, createdLinks* created, int servingPort);
 void* connectHandler(void* args);
 void destroyThreads(threads** th);
 

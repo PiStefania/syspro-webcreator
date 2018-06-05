@@ -1,65 +1,64 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h> 		// sockets
+#include <sys/socket.h> 	// sockets
+#include <netinet/in.h> 	// internet sockets
+#include <unistd.h> 		// read, write, close
+#include <netdb.h> 			// gethostbyaddr
+#include <string.h> 
+#include <fcntl.h> 
+#include <errno.h> 
 #include "threadPool.h"
 #include "variousMethods.h"
 #define POOL_DATA_SIZE 20
 
-//functions for pool data
-poolData* initializePoolData(){
-	poolData* data = malloc(sizeof(poolData));
-	data->bufferFds = malloc(POOL_DATA_SIZE*sizeof(int));
-	data->end = -1;
-	data->position = 0;
-}
-
-void insertPoolData(threads* th, int fd){
+void insertQueue(threads* th, char* link){
 	pthread_mutex_lock(&(th->lockData));
-	while (th->data->position >= POOL_DATA_SIZE) {
+	while (th->queue->size >= POOL_DATA_SIZE) {
+		printf("WAIT FOR POP TO HAPPEN\n");
 		pthread_cond_wait(&(th->notFull), &(th->lockData));
 	}
-	//insert to buffer
-	th->data->end = (th->data->end + 1) % POOL_DATA_SIZE;
-	th->data->bufferFds[th->data->end] = fd;
-	th->data->position++;
+	//insert to queue
+	printf("PUSH LINK\n");
+	pushLinksQueue(link, th);
 	pthread_mutex_unlock(&(th->lockData));
 }
 
-
-int getPoolData(threads* th){
+linkNode* popFromQueue(threads* th){
 	int fd = 0;
 	pthread_mutex_lock(&(th->lockData));
-	while(th->data->position <= 0) {
+	while(th->queue->size <= 0) {
+		printf("WAIT FOR PUSH TO HAPPEN\n");
 		pthread_cond_wait(&(th->notEmpty), &(th->lockData));
 	}
 	//get first elem 
-	fd = th->data->bufferFds[0];
-	//shift elems
-	for (int i=1;i < th->data->end;i++)
-  		th->data->bufferFds[i-1] = th->data->bufferFds[i];
-	th->data->position--;
+	printf("POP NODE\n");
+	linkNode* node = popLinksQueue(th);
 	pthread_mutex_unlock(&(th->lockData));
-	return fd;
-}
-
-void destroyPoolData(poolData** data){
-	free((*data)->bufferFds);
-	(*data)->bufferFds = NULL;
-	(*data)->end = -1;
-	(*data)->position = 0;
-	free(*data);
-	*data = NULL;
+	return node;
 }
 
 //functions for threads
-threads* initializeThreads(int numThreads, generalInfo* info, char* rootDir){
+threads* initializeThreads(int numThreads, generalInfo* info, char* saveDir, char* startingUrl, char* hostIP, linksQueue* queue, createdLinks* created, int servingPort){
 	threads* th = malloc(sizeof(threads));
 	th->tids = malloc(numThreads*sizeof(pthread_t));
 	th->noThreads = numThreads;
 	th->info = info;
-	th->rootDir = rootDir;
+	th->saveDir = saveDir;
+	th->startingUrl = startingUrl;
+	th->hostIP = hostIP;
+	th->queue = queue;
+	th->created = created;
+	th->servingPort = servingPort;
 	
 	if(pthread_mutex_init(&(th->lockData),NULL)!=0){
+		//destroy threads
+		destroyThreads(&th);
+		return NULL;
+	}
+	
+	if(pthread_mutex_init(&(th->lockAdditional),NULL)!=0){
 		//destroy threads
 		destroyThreads(&th);
 		return NULL;
@@ -77,9 +76,6 @@ threads* initializeThreads(int numThreads, generalInfo* info, char* rootDir){
 		return NULL;
 	}
 	
-	//initialize poolData
-	th->data = initializePoolData();
-	
 	for(int i=0;i<numThreads;i++){
 		if(pthread_create(&th->tids[i],NULL, (void*) connectHandler, th)!=0){
 			//destroy threads
@@ -92,13 +88,33 @@ threads* initializeThreads(int numThreads, generalInfo* info, char* rootDir){
 
 void* connectHandler(void* args){
 	threads* th = (threads*) args;
+	int sock, i;
+	struct sockaddr_in server;
+	struct sockaddr *serverptr = (struct sockaddr*)&server;
+	struct hostent *rem;
+	
+	if ((rem = gethostbyname(th->hostIP)) == NULL){			// Find server address
+		herror("gethostbyname"); 
+		exit(1);
+	}
+	
 	while(1){
-		//get fd
-		int newsock = getPoolData(th);
-		printf("newsock in thread: %d\n",newsock);
-		//readGetLinesFromCrawler(newsock,th->rootDir,th->info);
-		close(newsock);
-		pthread_cond_signal(&th->notFull);
+		//create socket and connect with server
+		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0){		// Create socket
+			perror("socket");
+			exit(1);
+		}
+		server.sin_family = AF_INET; 							// Internet domain 
+		memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
+		server.sin_port = htons(th->servingPort); 							// Server port 
+		if (connect(sock, serverptr, sizeof(server)) < 0){		// Initiate connection 
+			perror("connect");
+			exit(1);
+		}
+		printf("SOCK: %d CLOSE\n",sock);
+		//read lines and send to server
+		readGetLinesFromServer(sock,th);
+		close(sock);
 	}
 	pthread_exit(NULL);
 }
@@ -115,13 +131,11 @@ void destroyThreads(threads** th){
 	
 	(*th)->noThreads = -1;
 	
-	pthread_mutex_lock(&((*th)->lockData));
     pthread_mutex_destroy(&((*th)->lockData));
+    pthread_mutex_destroy(&((*th)->lockAdditional));
     pthread_cond_destroy(&((*th)->notEmpty));
     pthread_cond_destroy(&((*th)->notFull));
-	
-	destroyPoolData(&((*th)->data));
-	
+		
 	free((*th));
 	*th = NULL;
 }

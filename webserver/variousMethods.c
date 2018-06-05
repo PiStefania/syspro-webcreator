@@ -75,81 +75,81 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 	}
 }
 
-void readGetLinesFromCrawler(int newsock,char* rootDir,generalInfo* info){
+void readGetLinesFromCrawler(int newsock, threads* th){
 	char ch;
-	while(1){
-		int chars = 0;
-		if(read(newsock, &chars, sizeof(int)) < 0){
-			perror("read");
+	int chars = 0;
+	printf("SOCKET IN SERVER: %d\n",newsock);
+	if(read(newsock, &chars, sizeof(int)) < 0){
+		perror("read chars");
+		exit(1);
+	}
+
+	char buffer[chars+1];
+	if(read(newsock, &buffer, chars) < 0){
+		perror("read request");
+		exit(1);
+	}
+	buffer[chars] = '\0';
+	printf("BUFFER: '%s'\n",buffer);
+	//check request
+	char* response = NULL;
+	char* file = NULL;
+	int checkRequest = checkRequestInfo(buffer,&file);
+	if(file == NULL){
+		printf("NO FILE GIVEN\n");
+	}else if(!checkRequest){
+		printf("WRONG INPUT\n");
+	}
+	else{	//get answer for request
+		int fullLength = strlen(file) + strlen(th->rootDir) + 2;
+		char* fullPath = malloc(fullLength*sizeof(char));
+		strcpy(fullPath,th->rootDir);
+		strcat(fullPath,file);
+		//construct response for webcrawler
+		response = constructResponse(fullPath);
+		free(fullPath);
+		fullPath = NULL;
+	}
+
+	if(response != NULL){
+		pthread_mutex_lock(&(th->lockAdditional));
+		th->info->pagesServed++;
+		th->info->bytesServed += strlen(response);
+		pthread_mutex_unlock(&(th->lockAdditional));
+		int lengthResponse = strlen(response);
+		//initially write size of answer in socket
+		if(write(newsock, &lengthResponse, sizeof(int)) < 0){
+			perror("write size");
 			exit(1);
 		}
-		
-		char buffer[chars+1];
-		if(read(newsock, &buffer, chars) < 0){
-			perror("read");
-			exit(1);
-		}
-		buffer[chars] = '\0';
-		//check request
-		char* response = NULL;
-		char* file = NULL;
-		int checkRequest = checkRequestInfo(buffer,&file);
-		if(file == NULL){
-			printf("NO FILE GIVEN\n");
-			break;
-		}else if(!checkRequest){
-			printf("WRONG INPUT\n");
-			break;
-		}
-		else{	//get answer for request
-			int fullLength = strlen(file) + strlen(rootDir) + 2;
-			char* fullPath = malloc(fullLength*sizeof(char));
-			strcpy(fullPath,rootDir);
-			strcat(fullPath,file);
-			//construct response for webcrawler
-			response = constructResponse(fullPath);
-			free(fullPath);
-			fullPath = NULL;
-		}
-				
-		if(response != NULL){
-			info->pagesServed++;
-			info->bytesServed += strlen(response);
-			int lengthResponse = strlen(response);
-			//initially write size of answer in socket
-			if(write(newsock, &lengthResponse, sizeof(int)) < 0){
-				perror("write size");
+
+		int div = lengthResponse / DEF_BUFFER_SIZE;
+		if(div>1){
+			int bef = 0;
+			for(int i=0;i<=div;i++){
+				if(i==div){
+					if(write(newsock, response + bef, lengthResponse-bef) < 0){
+						perror("write last part");
+						exit(1);
+					}
+				}else{
+					if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
+						perror("write part");
+						exit(1);
+					}
+				}
+				bef += DEF_BUFFER_SIZE;
+			}
+		}else{
+			if(write(newsock, response, lengthResponse) < 0){
+				perror("write");
 				exit(1);
 			}
-		
-			int div = lengthResponse / DEF_BUFFER_SIZE;
-			if(div>1){
-				int bef = 0;
-				for(int i=0;i<=div;i++){
-					if(i==div){
-						if(write(newsock, response + bef, lengthResponse-bef) < 0){
-							perror("write last part");
-							exit(1);
-						}
-					}else{
-						if(write(newsock, response + bef, DEF_BUFFER_SIZE) < 0){
-							perror("write part");
-							exit(1);
-						}
-					}
-					bef += DEF_BUFFER_SIZE;
-				}
-			}else{
-				if(write(newsock, response, lengthResponse) < 0){
-					perror("write");
-					exit(1);
-				}
-			}
-			free(file);
-			file = NULL;
-			free(response);
-			response = NULL;
 		}
+		free(file);
+		file = NULL;
+		free(response);
+		response = NULL;
 	}
 }
 
@@ -230,13 +230,10 @@ void createManageSockets(int servingPort, int commandPort, threads* th){
 		 //If something happened on the master socket , then its an incoming connection
         if (FD_ISSET(sock, &readfds)) 
         {
+			printf("MAIN SOCK: %d\n",sock);
             clientlen = sizeof(client);
 			if ((newsock = accept(sock, clientptr, &clientlen))< 0){ 	// accept connection
 				perror("accept");
-				exit(1);
-			}
-			if ((rem = gethostbyaddr((char *) &client.sin_addr.s_addr, sizeof(client.sin_addr.s_addr), client.sin_family)) == NULL){		// Find client's name
-				herror("gethostbyaddr"); 
 				exit(1);
 			}
 			
@@ -250,6 +247,7 @@ void createManageSockets(int servingPort, int commandPort, threads* th){
 				exit(1);
 			}
 			whileFlag = readFromCommandPort(newsock,th);
+			close(newsock);
 		}
 	}
 	printf("Closing connections.\n");

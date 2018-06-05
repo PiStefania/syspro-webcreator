@@ -12,33 +12,35 @@ linksQueue* createLinksQueue(){
 	return queue;
 }
 
-void pushLinksQueue(linksQueue* queue,char* link, createdLinks* created){
-	if(binaryCheckCreated(created, link) == -1){
-		if(queue->size==0 || queue->first == NULL){
-			queue->first = malloc(sizeof(linkNode));
-			queue->first->link = malloc((strlen(link)+1)*sizeof(char));
-			queue->first->next = NULL;
-			strcpy(queue->first->link,link);
-			queue->last = queue->first;
-			queue->size++;
-			insertCreatedLinks(created,link);
+void pushLinksQueue(char* link, threads* th){
+	if(binaryCheckCreated(th->created, link) == -1){
+		if(th->queue->size==0 || th->queue->first == NULL){
+			th->queue->first = malloc(sizeof(linkNode));
+			th->queue->first->link = malloc((strlen(link)+1)*sizeof(char));
+			strcpy(th->queue->first->link,link);
+			th->queue->first->next = NULL;
+			th->queue->last = th->queue->first;
+			th->queue->size++;
+			insertCreatedLinks(th->created,link);
 		}else{
-			queue->last->next = malloc(sizeof(linkNode));
-			queue->last->next->link = malloc((strlen(link)+1)*sizeof(char));
-			queue->last->next->next = NULL;
-			strcpy(queue->last->next->link,link);
-			queue->last = queue->last->next;
-			queue->size++;
-			insertCreatedLinks(created,link);
+			th->queue->last->next = malloc(sizeof(linkNode));
+			th->queue->last->next->link = malloc((strlen(link)+1)*sizeof(char));
+			th->queue->last->next->next = NULL;
+			strcpy(th->queue->last->next->link,link);
+			th->queue->last = th->queue->last->next;
+			th->queue->size++;
+			insertCreatedLinks(th->created,link);
 		}
+		pthread_cond_signal(&(th->notEmpty));
 	}
 }
 
-linkNode* popLinksQueue(linksQueue* queue){
-	if(queue->size > 0){
-		linkNode* firstNode = queue->first;
-		queue->first = queue->first->next;
-		queue->size--;
+linkNode* popLinksQueue(threads* th){
+	if(th->queue->size > 0){
+		linkNode* firstNode = th->queue->first;
+		th->queue->first = th->queue->first->next;
+		th->queue->size--;
+		pthread_cond_signal(&(th->notFull));
 		return firstNode;
 	}else{
 		return NULL;
@@ -77,9 +79,11 @@ int isEmptyLinksQueue(linksQueue* queue){
 
 void printLinksQueue(linksQueue* queue){
 	linkNode* temp = queue->first;
-	for(int i=0;i< queue->size;i++){
+	int i=0;
+	while(temp!=NULL){
 		printf("%d Node: '%s'\n",i,temp->link);
 		temp = temp->next;
+		i++;
 	}
 }
 
@@ -111,7 +115,7 @@ char* createRequest(char* link, char* host){
 	return request;
 }
 
-void insertLinksQueueContent(linksQueue* queue, char* content, char* site, createdLinks* created){
+void insertLinksQueueContent(char* content, char* site, threads* th){
 	char* resultStart = NULL;
 	do{
 		char* linkStart = "<a href=";
@@ -141,7 +145,7 @@ void insertLinksQueueContent(linksQueue* queue, char* content, char* site, creat
 			sprintf(newPage,"/%s/%s",site,page);
 		}
 		//insert new page to queue
-		pushLinksQueue(queue,newPage,created);
+		insertQueue(th, newPage);
 		free(newPage);
 		newPage = NULL;
 		content = resultEnd + strlen(linkEnd);

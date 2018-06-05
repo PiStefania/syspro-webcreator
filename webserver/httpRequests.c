@@ -87,6 +87,7 @@ char* constructResponse(char* fullPath){
 			char* additionalBuf = insertAdditionalHeaders(&fullLength,lengthSize,size);
 			char* content = malloc((size+1)*sizeof(char));
 			int siteCopied = fread(content, 1, size, fp);
+			fclose(fp);
 			content[siteCopied] = '\0';
 			//copy to response
 			fullLength += siteCopied+1;
@@ -96,7 +97,6 @@ char* constructResponse(char* fullPath){
 			strcat(response,additionalBuf);
 			strcat(response,content);
 			response[fullLength-1] = '\0';
-			fclose(fp);
 			free(timeBuf);
 			timeBuf = NULL;
 			free(additionalBuf);

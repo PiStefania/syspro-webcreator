@@ -2,28 +2,32 @@
 #define _LINKS_QUEUE_H_
 
 typedef struct linkNode linkNode;
+typedef struct linksQueue linksQueue;
+typedef struct createdLinks createdLinks;
 
 struct linkNode{
 	char* link;
 	linkNode* next;
 };
 
-typedef struct linksQueue{
+struct linksQueue{
 	int size;
 	linkNode* first;
 	linkNode* last;
-}linksQueue;
+};
 
-typedef struct createdLinks{
+struct createdLinks{
 	char** createdArray;
 	int size;
 	int position;
-}createdLinks;
+};
+
+#include "threadPool.h"
 
 //linksQueue functions
 linksQueue* createLinksQueue();
-void pushLinksQueue(linksQueue* queue,char* link, createdLinks* created);
-linkNode* popLinksQueue(linksQueue* queue);
+void pushLinksQueue(char* link, threads* th);
+linkNode* popLinksQueue(threads* th);
 void destroyLinksQueue(linksQueue** queue);
 void destroyLinkNode(linkNode** node);
 int isEmptyLinksQueue(linksQueue* queue);
@@ -32,7 +36,7 @@ void printLinksQueue(linksQueue* queue);
 //functions for links
 char* convertToLink(char* startingUrl);
 char* createRequest(char* link, char* host);
-void insertLinksQueueContent(linksQueue* queue, char* content, char* site, createdLinks* created);
+void insertLinksQueueContent(char* content, char* site, threads* th);
 //functions for createdLinks
 createdLinks* createCreatedLinks();
 void doubleCreatedLinks(createdLinks* created);

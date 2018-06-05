@@ -3,11 +3,12 @@
 
 #include "linksQueue.h"
 #include "generalInfo.h"
+#include "threadPool.h"
 
 void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* commandPort,int* numThreads,char** saveDir,char** startingUrl);
-void readGetLinesFromServer(linksQueue* queue, char* host, int socket, char* saveDir, createdLinks* created, generalInfo* info);
+void readGetLinesFromServer(int socket, threads* th);
 char* createFileSaveDir(char* saveDir, char* response, char* fileName);
-void createManageSockets(int servingPort, int commandPort, char* hostIP, char* startingUrl, char* saveDir, generalInfo* info);
+void createManageSockets(int servingPort, int commandPort, threads* th);
 int readFromCommandPort(int socket, generalInfo* info, char* saveDir);
 
 #endif
