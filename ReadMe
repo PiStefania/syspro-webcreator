@@ -56,3 +56,4 @@
 -Στον webcrawler, το free των threads γίνεται με pthread_kill, ενώ στον webserver, το free γίνεται με pthread_cancel -> pthread_join.
 -Η δημιουργία των socket και η διαχείριση των pool, έγινε με την καθοδήγηση των διαφανειών του μαθήματος.
 -Για το redirect των stdin/stdout του jobExecutor, συμβουλεύτηκα την σελίδα: https://stackoverflow.com/questions/20187734/c-pipe-to-stdin-of-another-program
+-Τα threads περιμένουν 3 seconds(sleep(3)) έτσι ώστε η δημιουργία του socket τους να είναι επιτυχής.

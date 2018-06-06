@@ -100,7 +100,7 @@ void* connectHandler(void* args){
 	int sock;
 	struct sockaddr_in server;
 	
-	sleep(2);
+	sleep(3);
 	while(1){
 		//create socket and connect with server
 		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0){		// Create socket
