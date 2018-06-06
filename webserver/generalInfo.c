@@ -7,6 +7,7 @@
 #include <math.h>
 #include "generalInfo.h"
 
+//create generalInfo structure
 generalInfo* createGeneralInfo(){
 	generalInfo* info = malloc(sizeof(generalInfo));
 	info->millis = 0;
@@ -16,6 +17,7 @@ generalInfo* createGeneralInfo(){
 	return info;
 }
 
+//print STATS command info
 void printStats(generalInfo* info, int newsock){
 	//get duration
 	struct timeb after;
@@ -29,6 +31,7 @@ void printStats(generalInfo* info, int newsock){
 	char* buffer = malloc(100*sizeof(char));
 	int millis = abs(after.millitm - info->millis);
 	
+	//check for zeros in format
 	if(minutes > 10 && seconds > 10){
 		sprintf(buffer,"Server up for 0%d:%ld:%ld.%d, served %d pages, %ld bytes\n",hours,minutes,seconds,millis,info->pagesServed,info->bytesServed);
 		if(write(newsock,buffer,strlen(buffer)) < 0){

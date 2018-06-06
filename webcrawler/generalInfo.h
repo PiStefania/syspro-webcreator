@@ -2,10 +2,10 @@
 #define _GENERAL_INFO_H_
 
 typedef struct generalInfo{
-	int millis;
-	long startTime;
-	int pagesDownloaded;
-	long bytesDownloaded;
+	int millis;					//started milliseconds
+	long startTime;				//started seconds
+	int pagesDownloaded;		//pages downloaded
+	long bytesDownloaded;		//bytes downloaded
 }generalInfo;
 
 generalInfo* createGeneralInfo();

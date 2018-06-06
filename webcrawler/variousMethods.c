@@ -89,12 +89,13 @@ void pickArgumentsMain(int argc,char* argv[],char** hostIP,int* port,int* comman
 	}
 }
 
+//create request and read response from server
 void readGetLinesFromServer(int socket, threads* th){
+	//create request
 	int chars=0;
 	char* fileName = NULL;
 	linkNode* node = popFromQueue(th);
 	char* request = createRequest(node->link, th->hostIP);
-	printf("REQUEST: %s\n",request);
 	fileName = malloc((strlen(node->link)+1)*sizeof(char));
 	strcpy(fileName,node->link);
 	destroyLinkNode(&node);
@@ -110,16 +111,12 @@ void readGetLinesFromServer(int socket, threads* th){
 	free(request);
 	request = NULL;
 	
+	//get response
 	int responseChars = 0;
 	if(read(socket, &responseChars, sizeof(int)) < 0){
 		perror("read chars");
 		exit(1);
 	}
-
-	pthread_mutex_lock(&(th->lockAdditional));
-	th->info->pagesDownloaded++;
-	th->info->bytesDownloaded += responseChars;
-	pthread_mutex_unlock(&(th->lockAdditional));
 
 	int div = responseChars / DEF_BUFFER_SIZE;
 	char* responseBuffer = malloc((responseChars+1)*sizeof(char));
@@ -158,6 +155,10 @@ void readGetLinesFromServer(int socket, threads* th){
 
 	//insert content to new file
 	char* content = createFileSaveDir(th->saveDir,responseBuffer,fileName);
+	pthread_mutex_lock(&(th->lockAdditional));
+	th->info->pagesDownloaded++;
+	th->info->bytesDownloaded += strlen(content);
+	pthread_mutex_unlock(&(th->lockAdditional));
 	//insert links from content to queue
 	char* site = strtok(fileName,"/");
 	insertLinksQueueContent(content,site,th);
@@ -170,6 +171,7 @@ void readGetLinesFromServer(int socket, threads* th){
 }
 
 char* createFileSaveDir(char* saveDir, char* response, char* fileName){
+	//create file to save_dir
 	char* content = strstr(response,"<!DOCTYPE");
 	if(content == NULL){
 		content = strstr(response,"<html>");
@@ -230,6 +232,21 @@ void createManageSockets(int servingPort, int commandPort, threads* th){
 	FD_SET(sockCommand, &readfds);
 	maxSd = sockCommand;
 	
+	struct sockaddr_in server;
+	struct sockaddr *serverptr = (struct sockaddr*)&server;
+	struct hostent *rem;
+	
+	if ((rem = gethostbyname(th->hostIP)) == NULL){			// Find server address
+		herror("gethostbyname"); 
+		exit(1);
+	}
+	
+	server.sin_family = AF_INET; 							// Internet domain 
+	memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
+	server.sin_port = htons(th->servingPort); 
+	
+	th->serverptr = serverptr;
+	
 	while (whileFlag) { 
 		//wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
         int activity = select( maxSd + 1 , &readfds , NULL , NULL , NULL);
@@ -264,6 +281,8 @@ int readFromCommandPort(int socket, generalInfo* info, char* saveDir){
 		i++;
 	}
 	buffer[i-1] = '\0';
+	if(buffer[0] == '\0')
+		return 1;
 	if(strcmp(buffer,"STATS")==0){
 		printStats(info,socket);
 	}else if(strcmp(buffer,"SHUTDOWN")==0){

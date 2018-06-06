@@ -22,6 +22,13 @@ int main (int argc,char* argv[]){
 	char* rootDir = NULL;
 	pickArgumentsMain(argc,argv,&servingPort,&commandPort,&numThreads,&rootDir);
 	
+	if(servingPort == commandPort){
+		printf("Serving and command port are the same. Abort.\n");
+		free(info);
+		info = NULL;
+		exit(1);
+	}
+	
 	//create threads
 	threads* th = initializeThreads(numThreads,info,rootDir);
 	

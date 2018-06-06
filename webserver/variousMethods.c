@@ -75,10 +75,10 @@ void pickArgumentsMain(int argc,char* argv[],int* servingPort,int* commandPort,i
 	}
 }
 
+//read request and respond
 void readGetLinesFromCrawler(int newsock, threads* th){
 	char ch;
 	int chars = 0;
-	printf("SOCKET IN SERVER: %d\n",newsock);
 	if(read(newsock, &chars, sizeof(int)) < 0){
 		perror("read chars");
 		exit(1);
@@ -90,7 +90,6 @@ void readGetLinesFromCrawler(int newsock, threads* th){
 		exit(1);
 	}
 	buffer[chars] = '\0';
-	printf("BUFFER: '%s'\n",buffer);
 	//check request
 	char* response = NULL;
 	char* file = NULL;
@@ -106,16 +105,12 @@ void readGetLinesFromCrawler(int newsock, threads* th){
 		strcpy(fullPath,th->rootDir);
 		strcat(fullPath,file);
 		//construct response for webcrawler
-		response = constructResponse(fullPath);
+		response = constructResponse(fullPath,th);
 		free(fullPath);
 		fullPath = NULL;
 	}
 
 	if(response != NULL){
-		pthread_mutex_lock(&(th->lockAdditional));
-		th->info->pagesServed++;
-		th->info->bytesServed += strlen(response);
-		pthread_mutex_unlock(&(th->lockAdditional));
 		int lengthResponse = strlen(response);
 		//initially write size of answer in socket
 		if(write(newsock, &lengthResponse, sizeof(int)) < 0){
@@ -165,6 +160,7 @@ int getNumberLength(int no){
 	return numberLength;
 }
 
+//handle sockets
 void createManageSockets(int servingPort, int commandPort, threads* th){
 	//set of socket descriptors
     fd_set readfds;
@@ -230,7 +226,6 @@ void createManageSockets(int servingPort, int commandPort, threads* th){
 		 //If something happened on the master socket , then its an incoming connection
         if (FD_ISSET(sock, &readfds)) 
         {
-			printf("MAIN SOCK: %d\n",sock);
             clientlen = sizeof(client);
 			if ((newsock = accept(sock, clientptr, &clientlen))< 0){ 	// accept connection
 				perror("accept");
@@ -255,6 +250,7 @@ void createManageSockets(int servingPort, int commandPort, threads* th){
 	close(sockCommand);
 }
 
+//read from command and write back
 int readFromCommandPort(int newsock, threads* th){
 	char ch;
 	char buffer[10];
@@ -265,6 +261,8 @@ int readFromCommandPort(int newsock, threads* th){
 		buffer[i] = ch;
 		i++;
 	}
+	if(buffer[0] == '\0')
+		return 1;
 	buffer[i-1] = '\0';
 	if(strcmp(buffer,"STATS")==0){
 		printStats(th->info,newsock);

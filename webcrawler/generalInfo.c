@@ -14,6 +14,7 @@
 #include "generalInfo.h"
 #define POLL_MILLI 2000
 
+//create info for stats
 generalInfo* createGeneralInfo(){
 	generalInfo* info = malloc(sizeof(generalInfo));
 	info->millis = 0;
@@ -36,6 +37,7 @@ void printStats(generalInfo* info, int socket){
 	char* buffer = malloc(100*sizeof(char));
 	int millis = abs(after.millitm - info->millis);
 	
+	//for zeros format
 	if(minutes > 10 && seconds > 10){
 		sprintf(buffer,"Crawler up for 0%d:%ld:%ld.%d, downloaded %d pages, %ld bytes\n",hours,minutes,seconds,millis,info->pagesDownloaded,info->bytesDownloaded);
 		if(write(socket,buffer,strlen(buffer)) < 0){
@@ -69,6 +71,7 @@ void printStats(generalInfo* info, int socket){
 	buffer = NULL;
 }
 
+//execute search command
 void executeJobExecutor(char* searchWords, char* saveDir, int socket){
 	if(searchWords == NULL){
 		printf("NO SEARCH WORDS FOUND\n");
@@ -84,6 +87,7 @@ void executeJobExecutor(char* searchWords, char* saveDir, int socket){
 	int i=1;
 	while(i<10){
 		if(token != NULL){
+			//ignore words with tags
 			if(token[0] == '<' && token[strlen(token)-1] == '>'){
 				token = strtok(NULL," \t");
 				continue;

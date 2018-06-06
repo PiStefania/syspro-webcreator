@@ -78,7 +78,7 @@ save_pages(){
 		stringw="site$i"
 		for ((j=0;j <= LIMITP;j++))
 		{
-			stringp="page"$j"_$RANDOM.html"
+			stringp="page"$i"_$RANDOM.html"
 			stringWhole="./${args[0]}/$stringw/$stringp"
 			arrP+=($stringWhole)
 		}

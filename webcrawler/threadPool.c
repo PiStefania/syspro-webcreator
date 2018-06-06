@@ -9,31 +9,30 @@
 #include <string.h> 
 #include <fcntl.h> 
 #include <errno.h> 
+#include <signal.h> 
 #include "threadPool.h"
 #include "variousMethods.h"
 #define POOL_DATA_SIZE 20
 
+//insert to queue
 void insertQueue(threads* th, char* link){
 	pthread_mutex_lock(&(th->lockData));
 	while (th->queue->size >= POOL_DATA_SIZE) {
-		printf("WAIT FOR POP TO HAPPEN\n");
 		pthread_cond_wait(&(th->notFull), &(th->lockData));
 	}
 	//insert to queue
-	printf("PUSH LINK\n");
 	pushLinksQueue(link, th);
 	pthread_mutex_unlock(&(th->lockData));
 }
 
+//pop from queue
 linkNode* popFromQueue(threads* th){
 	int fd = 0;
 	pthread_mutex_lock(&(th->lockData));
 	while(th->queue->size <= 0) {
-		printf("WAIT FOR PUSH TO HAPPEN\n");
 		pthread_cond_wait(&(th->notEmpty), &(th->lockData));
 	}
 	//get first elem 
-	printf("POP NODE\n");
 	linkNode* node = popLinksQueue(th);
 	pthread_mutex_unlock(&(th->lockData));
 	return node;
@@ -76,6 +75,14 @@ threads* initializeThreads(int numThreads, generalInfo* info, char* saveDir, cha
 		return NULL;
 	}
 	
+	char* link = convertToLink(startingUrl);
+	
+	pthread_mutex_lock(&(th->lockData));
+	pushLinksQueue(link,th);
+	pthread_mutex_unlock(&(th->lockData));
+	free(link);
+	link = NULL;
+	
 	for(int i=0;i<numThreads;i++){
 		if(pthread_create(&th->tids[i],NULL, (void*) connectHandler, th)!=0){
 			//destroy threads
@@ -83,35 +90,27 @@ threads* initializeThreads(int numThreads, generalInfo* info, char* saveDir, cha
 			return NULL;
 		}
 	}
+
 	return th;
 }
 
+//connect thread with sock
 void* connectHandler(void* args){
 	threads* th = (threads*) args;
-	int sock, i;
+	int sock;
 	struct sockaddr_in server;
-	struct sockaddr *serverptr = (struct sockaddr*)&server;
-	struct hostent *rem;
 	
-	if ((rem = gethostbyname(th->hostIP)) == NULL){			// Find server address
-		herror("gethostbyname"); 
-		exit(1);
-	}
-	
+	sleep(2);
 	while(1){
 		//create socket and connect with server
 		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0){		// Create socket
 			perror("socket");
 			exit(1);
-		}
-		server.sin_family = AF_INET; 							// Internet domain 
-		memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
-		server.sin_port = htons(th->servingPort); 							// Server port 
-		if (connect(sock, serverptr, sizeof(server)) < 0){		// Initiate connection 
+		}							
+		if (connect(sock, th->serverptr, sizeof(server)) < 0){		// Initiate connection 
 			perror("connect");
 			exit(1);
 		}
-		printf("SOCK: %d CLOSE\n",sock);
 		//read lines and send to server
 		readGetLinesFromServer(sock,th);
 		close(sock);
@@ -119,10 +118,12 @@ void* connectHandler(void* args){
 	pthread_exit(NULL);
 }
 
+//destroy threads
 void destroyThreads(threads** th){
 	for(size_t i = 0; i<(*th)->noThreads; i++) {
-        pthread_join((*th)->tids[i], NULL);
+        pthread_kill((*th)->tids[i],0);
     }
+	
 			
 	if((*th)->tids!=NULL){
 		free((*th)->tids);

@@ -5,21 +5,22 @@
 #include "generalInfo.h"
 
 typedef struct poolData{
-	int* bufferFds;
-	int end;
-	int position;
+	int* bufferFds;			//buffer of fds
+	int end;				//end of buffer
+	int position;			//current size of buffer
+	int start;
 }poolData;
 
 typedef struct threads{
-	int noThreads;
+	int noThreads;					//number of threads
 	pthread_t* tids; 				// execution threads
-	pthread_cond_t notEmpty;
-	pthread_cond_t notFull;
-	pthread_mutex_t lockData;
-	pthread_mutex_t lockAdditional;
-	poolData* data;
-	generalInfo* info;
-	char* rootDir;
+	pthread_cond_t notEmpty;		//cond var for checking if poolData is empty
+	pthread_cond_t notFull;			//cond var for checking if poolData is full
+	pthread_mutex_t lockData;		//mutex for locking poolData
+	pthread_mutex_t lockAdditional;		//mutex for locking additional data like generalInfo alterations
+	poolData* data;						//data that the threads alter
+	generalInfo* info;					//helpful for argument
+	char* rootDir;						//helpful for argument
 }threads;
 
 //functions for pool data

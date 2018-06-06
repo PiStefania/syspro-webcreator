@@ -4,6 +4,7 @@
 #include "linksQueue.h"
 #define DEF_CREATED_SIZE 5
 
+//create queue
 linksQueue* createLinksQueue(){
 	linksQueue* queue = malloc(sizeof(linksQueue));
 	queue->size = 0;
@@ -12,6 +13,7 @@ linksQueue* createLinksQueue(){
 	return queue;
 }
 
+//insert to queue
 void pushLinksQueue(char* link, threads* th){
 	if(binaryCheckCreated(th->created, link) == -1){
 		if(th->queue->size==0 || th->queue->first == NULL){
@@ -35,6 +37,7 @@ void pushLinksQueue(char* link, threads* th){
 	}
 }
 
+//pop from queue
 linkNode* popLinksQueue(threads* th){
 	if(th->queue->size > 0){
 		linkNode* firstNode = th->queue->first;
@@ -47,6 +50,7 @@ linkNode* popLinksQueue(threads* th){
 	}
 }
 
+//destroy queue
 void destroyLinksQueue(linksQueue** queue){
 	linkNode* temp = (*queue)->first;
 	for(int i=0;i<(*queue)->size;i++){
@@ -61,6 +65,7 @@ void destroyLinksQueue(linksQueue** queue){
 	*queue = NULL;
 }
 
+//destroy node of queue
 void destroyLinkNode(linkNode** node){
 	free((*node)->link);
 	(*node)->link = NULL;
@@ -69,7 +74,7 @@ void destroyLinkNode(linkNode** node){
 	*node = NULL;
 }
 
-
+//check if queue empty
 int isEmptyLinksQueue(linksQueue* queue){
 	if(queue->size == 0){
 		return 1;
@@ -77,6 +82,7 @@ int isEmptyLinksQueue(linksQueue* queue){
 	return 0;
 }
 
+//print queue
 void printLinksQueue(linksQueue* queue){
 	linkNode* temp = queue->first;
 	int i=0;
@@ -87,6 +93,7 @@ void printLinksQueue(linksQueue* queue){
 	}
 }
 
+//convert starting url to link
 char* convertToLink(char* startingUrl){
 	char* token = strtok(startingUrl,"/");
 	token = strtok(NULL,"/");
@@ -105,6 +112,7 @@ char* convertToLink(char* startingUrl){
 	return link;
 }
 
+//create request from link
 char* createRequest(char* link, char* host){
 	int lengthFirstLine = strlen("GET  HTTP/1.1\n") + strlen(link) + 1;
 	int lengthHostLine = strlen("Host: \n") + strlen(host) + 1;
@@ -115,13 +123,15 @@ char* createRequest(char* link, char* host){
 	return request;
 }
 
+//insert found link in file to queue
 void insertLinksQueueContent(char* content, char* site, threads* th){
 	char* resultStart = NULL;
 	do{
 		char* linkStart = "<a href=";
 		resultStart = strstr(content, linkStart);
-		if(resultStart == NULL)
+		if(resultStart == NULL){
 			break;
+		}
 		int positionStart = resultStart - content;
 		char* linkEnd = "</a>";
 		char* resultEnd = strstr(content, linkEnd);
@@ -152,6 +162,7 @@ void insertLinksQueueContent(char* content, char* site, threads* th){
 	} while(resultStart != NULL);
 }
 
+//create array for checking the existence of links
 createdLinks* createCreatedLinks(){
 	createdLinks* created = malloc(sizeof(createdLinks));
 	created->size = DEF_CREATED_SIZE;
@@ -163,6 +174,7 @@ createdLinks* createCreatedLinks(){
 	return created;
 }
 
+//double array
 void doubleCreatedLinks(createdLinks* created){
 	int oldSize = created->size;
 	int newSize = oldSize + 5;
@@ -173,6 +185,7 @@ void doubleCreatedLinks(createdLinks* created){
 	created->size = newSize;
 }
 
+//insert links with insertion sort
 void insertCreatedLinks(createdLinks* created, char* link){
 	int getPosition = binarySearchCreatedLinks(created,link);
 	//full array
@@ -204,6 +217,7 @@ void insertCreatedLinks(createdLinks* created, char* link){
 	}
 }
 
+//return position we need to insert link
 int binarySearchCreatedLinks(createdLinks* created, char* link){
 	int first = 0;
 	int last = created->position;
@@ -233,6 +247,7 @@ int binarySearchCreatedLinks(createdLinks* created, char* link){
     return mid;
 }
 
+//check if link exists in array
 int binaryCheckCreated(createdLinks* created, char* link){
 	int first = 0;
 	int last = created->position-1;
@@ -253,12 +268,14 @@ int binaryCheckCreated(createdLinks* created, char* link){
     return -1;
 }
 	
+//print array of links
 void printCreatedLinks(createdLinks* created){
 	for(int i=0;i<created->position;i++){
 		printf("Created: '%s'\n",created->createdArray[i]);
 	}
 }
-	
+
+//destroy array of links
 void destroyCreatedLinks(createdLinks** created){
 	for(int i=0;i<(*created)->position;i++){
 		if((*created)->createdArray[i] != NULL){

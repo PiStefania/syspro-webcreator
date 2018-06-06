@@ -13,45 +13,38 @@ poolData* initializePoolData(){
 	data->bufferFds = malloc(POOL_DATA_SIZE*sizeof(int));
 	data->end = -1;
 	data->position = 0;
+	data->start = 0;
 }
 
+//insert to the end a fd
 void insertPoolData(threads* th, int fd){
 	pthread_mutex_lock(&(th->lockData));
 	while (th->data->position >= POOL_DATA_SIZE) {
-		printf("BUFFER FULL\n");
 		pthread_cond_wait(&(th->notFull), &(th->lockData));
 	}
 	//insert to buffer
-	printf("INSERT TO BUFFER\n");
 	th->data->end = (th->data->end + 1) % POOL_DATA_SIZE;
 	th->data->bufferFds[th->data->end] = fd;
 	th->data->position++;
-	printFDs(th->data);
 	pthread_mutex_unlock(&(th->lockData));
 }
 
-
+//get first item from fds
 int getPoolData(threads* th){
 	int fd = 0;
 	pthread_mutex_lock(&(th->lockData));
 	while(th->data->position <= 0) {
-		printf("BUFFER EMPTY\n");
 		pthread_cond_wait(&(th->notEmpty), &(th->lockData));
 	}
 	//get first elem 
-	printf("GET FROM BUFFER\n");
-	fd = th->data->bufferFds[0];
-	printf("GOT %d\n",fd);
-	//shift elems
-	for (int i=1;i < th->data->end;i++)
-  		th->data->bufferFds[i-1] = th->data->bufferFds[i];
+	fd = th->data->bufferFds[th->data->start];
+	th->data->start = (th->data->start + 1) % POOL_DATA_SIZE;
 	th->data->position--;
-	printFDs(th->data);
 	pthread_mutex_unlock(&(th->lockData));
-	printf("FD: %d\n",fd);
 	return fd;
 }
 
+//destroy pool data
 void destroyPoolData(poolData** data){
 	free((*data)->bufferFds);
 	(*data)->bufferFds = NULL;
@@ -106,21 +99,23 @@ threads* initializeThreads(int numThreads, generalInfo* info, char* rootDir){
 	return th;
 }
 
+//accept connection
 void* acceptHandler(void* args){
 	threads* th = (threads*) args;
 	while(1){
 		//get fd
 		int newsock = getPoolData(th);
-		printf("NEW SOCK: %d\n",newsock);
+		pthread_cond_signal(&th->notFull);
 		readGetLinesFromCrawler(newsock,th);
 		close(newsock);
-		pthread_cond_signal(&th->notFull);
 	}
 	pthread_exit(NULL);
 }
 
+//destroy threads
 void destroyThreads(threads** th){
 	for(size_t i = 0; i<(*th)->noThreads; i++) {
+        pthread_cancel((*th)->tids[i]);
         pthread_join((*th)->tids[i], NULL);
     }
 			
@@ -142,6 +137,7 @@ void destroyThreads(threads** th){
 	*th = NULL;
 }
 
+//print fds
 void printFDs(poolData* data){
 	for(int i=0;i<data->position;i++){
 		printf("Data: %d\n",data->bufferFds[i]);

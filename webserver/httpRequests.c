@@ -11,6 +11,7 @@ static char FILE_OK[] = {"HTTP/1.1 200 OK\n"};
 static char FILE_NOT_FOUND[] = {"HTTP/1.1 404 Not Found\n"};
 static char FILE_NOT_AUTHORIZED[] = {"HTTP/1.1 403 Forbidden\n"};
 
+//check if request is valid
 int checkRequestInfo(char* request, char** file){
 	int lines = 0;
 	int length = 0;
@@ -70,11 +71,12 @@ int checkHeader(char* header){
 	return 0;
 }
 
-char* constructResponse(char* fullPath){
+//create response for each case
+char* constructResponse(char* fullPath,threads* th){
 	int fullLength = 0;
 	char* response = NULL;
 	if(access(fullPath, F_OK) != -1){
-		if(access(fullPath, R_OK) != -1){
+		if(access(fullPath, R_OK) != -1){			//can be accessed
 			fullLength += strlen(FILE_OK);
 			//get characters of file
 			FILE *fp = fopen(fullPath,"r");
@@ -103,7 +105,11 @@ char* constructResponse(char* fullPath){
 			additionalBuf = NULL;
 			free(content);
 			content = NULL;
-		}else{
+			pthread_mutex_lock(&(th->lockAdditional));
+			th->info->pagesServed++;
+			th->info->bytesServed += siteCopied;
+			pthread_mutex_unlock(&(th->lockAdditional));
+		}else{												//no permission
 			fullLength += strlen(FILE_NOT_AUTHORIZED);
 			//add time and headers
 			char* timeBuf = insertCurrentTime(&fullLength);
@@ -124,7 +130,7 @@ char* constructResponse(char* fullPath){
 			free(content);
 			content = NULL;
 		}
-	}else{
+	}else{												//not found
 		fullLength += strlen(FILE_NOT_FOUND);
 		//add time and headers
 		char* timeBuf = insertCurrentTime(&fullLength);

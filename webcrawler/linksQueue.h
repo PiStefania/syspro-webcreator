@@ -5,18 +5,18 @@ typedef struct linkNode linkNode;
 typedef struct linksQueue linksQueue;
 typedef struct createdLinks createdLinks;
 
-struct linkNode{
-	char* link;
+struct linkNode{			//node of queue
+	char* link;				
 	linkNode* next;
 };
 
-struct linksQueue{
+struct linksQueue{			//queue of linkNodes
 	int size;
 	linkNode* first;
 	linkNode* last;
 };
 
-struct createdLinks{
+struct createdLinks{		//array that checks if a link has already been pushed
 	char** createdArray;
 	int size;
 	int position;
